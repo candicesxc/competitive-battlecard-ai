@@ -10,10 +10,9 @@ from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
-SERPAPI_ENDPOINT = "https://serpapi.com/search"
-SERPAPI_ENGINES = {
-    "search": "google",
-    "news": "google_news",
+SERPER_ENDPOINTS = {
+    "search": "https://google.serper.dev/search",
+    "news": "https://google.serper.dev/news",
 }
 
 SERPAPI_ENDPOINT = "https://serpapi.com/search"
@@ -37,21 +36,25 @@ def extract_domain(url: str) -> Optional[str]:
     return None
 
 
-async def _serpapi_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Perform a GET request to the SerpAPI service and return the JSON body."""
+async def _serper_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Perform a POST request to the Serper API and return the JSON body."""
 
     settings = get_settings()
     if not settings.serper_api_key:
         raise SearchProviderError("Serper API key is not configured.")
 
+    endpoint = SERPER_ENDPOINTS.get(kind)
+    if not endpoint:
+        raise SearchProviderError(f"Unsupported Serper request type: {kind}")
+
     headers = {
-        "X-API-KEY": api_key,
+        "X-API-KEY": settings.serper_api_key.get_secret_value(),
         "Content-Type": "application/json",
     }
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
         try:
-            response = await client.get(SERPAPI_ENDPOINT, params=params)
+            response = await client.post(endpoint, json=payload, headers=headers)
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             body = exc.response.text
@@ -156,10 +159,7 @@ async def _search_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         raise SearchProviderError(str(exc)) from exc
 
     if provider == "serper":
-        endpoint = SERPER_ENDPOINTS.get(kind)
-        if not endpoint:
-            raise SearchProviderError(f"Unsupported Serper request type: {kind}")
-        response = await _serper_request(endpoint, payload)
+        response = await _serper_request(kind, payload)
     elif provider == "serpapi":
         response = await _serpapi_request(kind, payload)
     else:
@@ -261,15 +261,16 @@ def parse_company_overview(search_results: Dict[str, Any]) -> Dict[str, Any]:
     organic = search_results.get("organic") or search_results.get(
         "organic_results", []
     )
-    people_search = knowledge_graph.get("peopleAlsoSearchFor", [])
 
     overview = {
-        "name": knowledge_graph.get("title") or (organic[0].get("title") if organic else None),
+        "name": knowledge_graph.get("title")
+        or (organic[0].get("title") if organic else None),
         "description": knowledge_graph.get("description")
         or (organic[0].get("snippet") if organic else None),
-        "website": knowledge_graph.get("website") or (organic[0].get("link") if organic else None),
+        "website": knowledge_graph.get("website")
+        or (organic[0].get("link") if organic else None),
         "profiles": knowledge_graph.get("profiles", []),
-        "related": people_search,
+        "related": knowledge_graph.get("peopleAlsoSearchFor", []),
     }
 
     return overview
@@ -284,5 +285,3 @@ __all__ = [
     "parse_company_overview",
     "extract_domain",
 ]
-
-
