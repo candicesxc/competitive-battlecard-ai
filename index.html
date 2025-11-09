@@ -74,10 +74,17 @@
 
       <section
         id="loading-state"
-        class="mt-8 hidden items-center justify-center gap-3 rounded-xl border border-indigo-200 bg-white/90 px-4 py-3 text-sm text-indigo-600 shadow-sm"
+        class="mt-8 hidden rounded-xl border border-indigo-200 bg-white/90 px-4 py-4 text-sm text-indigo-600 shadow-sm"
       >
-        <span class="loader h-4 w-4 border-2 border-indigo-200"></span>
-        <span>Generating battlecard… this can take up to a minute.</span>
+        <div class="mx-auto w-full max-w-xl space-y-2">
+          <div class="flex items-center justify-between text-xs font-medium text-indigo-700">
+            <span id="progress-message">Analyzing company website…</span>
+            <span id="progress-value">0%</span>
+          </div>
+          <div class="progress-track">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+        </div>
       </section>
 
       <section id="results" class="mt-10 hidden fade-in">
