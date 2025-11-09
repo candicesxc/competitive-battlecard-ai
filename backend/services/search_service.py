@@ -15,9 +15,15 @@ SERPER_ENDPOINTS = {
     "news": "https://google.serper.dev/news",
 }
 
+SERPAPI_ENDPOINT = "https://serpapi.com/search"
+SERPAPI_ENGINES = {
+    "search": "google",
+    "news": "google_news",
+}
 
-class SerperError(RuntimeError):
-    """Custom exception raised when Serper API calls fail."""
+
+class SearchProviderError(RuntimeError):
+    """Custom exception raised when external search API calls fail."""
 
 
 def extract_domain(url: str) -> Optional[str]:
@@ -34,6 +40,9 @@ async def _serper_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, A
     """Perform a POST request to the Serper API and return the JSON body."""
 
     settings = get_settings()
+    if not settings.serper_api_key:
+        raise SearchProviderError("Serper API key is not configured.")
+
     headers = {
         "X-API-KEY": settings.serper_api_key.get_secret_value(),
         "Content-Type": "application/json",
@@ -45,13 +54,117 @@ async def _serper_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, A
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             body = exc.response.text
-            logger.error("Serper API returned error %s: %s", exc.response.status_code, body)
-            raise SerperError(f"Serper API error: {exc.response.status_code}") from exc
+            logger.error(
+                "Serper API returned error %s: %s", exc.response.status_code, body
+            )
+            raise SearchProviderError(
+                f"Search provider 'serper' returned error {exc.response.status_code}"
+            ) from exc
         except httpx.HTTPError as exc:
             logger.exception("Serper API request failed")
-            raise SerperError("Serper API request failed") from exc
+            raise SearchProviderError("Search provider 'serper' request failed") from exc
 
     return response.json()
+
+
+async def _serpapi_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Perform a GET request to the SerpAPI service and return the JSON body."""
+
+    settings = get_settings()
+    if not settings.serpapi_api_key:
+        raise SearchProviderError("SerpAPI key is not configured.")
+
+    engine = SERPAPI_ENGINES.get(kind)
+    if not engine:
+        raise SearchProviderError(f"Unsupported SerpAPI request type: {kind}")
+
+    params = {
+        "api_key": settings.serpapi_api_key.get_secret_value(),
+        "engine": engine,
+        **payload,
+    }
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+        try:
+            response = await client.get(SERPAPI_ENDPOINT, params=params)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            body = exc.response.text
+            logger.error(
+                "SerpAPI returned error %s: %s", exc.response.status_code, body
+            )
+            raise SearchProviderError(
+                f"Search provider 'serpapi' returned error {exc.response.status_code}"
+            ) from exc
+        except httpx.HTTPError as exc:
+            logger.exception("SerpAPI request failed")
+            raise SearchProviderError("Search provider 'serpapi' request failed") from exc
+
+    return response.json()
+
+
+def _normalize_search_results(
+    provider: str, kind: str, response: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Normalize provider-specific payload differences."""
+
+    if provider != "serpapi":
+        return response
+
+    normalized: Dict[str, Any] = dict(response)
+
+    organic_results = response.get("organic_results")
+    if organic_results is not None and "organic" not in normalized:
+        normalized["organic"] = organic_results
+
+    knowledge_graph = response.get("knowledge_graph")
+    if knowledge_graph is not None:
+        normalized_kg = dict(knowledge_graph)
+        if (
+            "people_also_search_for" in knowledge_graph
+            and "peopleAlsoSearchFor" not in normalized_kg
+        ):
+            normalized_kg["peopleAlsoSearchFor"] = knowledge_graph[
+                "people_also_search_for"
+            ]
+        normalized.setdefault("knowledgeGraph", normalized_kg)
+
+    if kind == "news":
+        news_items = response.get("news_results")
+        if news_items is not None:
+            normalized["news"] = [
+                {
+                    "title": item.get("title"),
+                    "link": item.get("link"),
+                    "snippet": item.get("snippet") or item.get("summary"),
+                    "date": item.get("date"),
+                }
+                for item in news_items
+            ]
+
+    return normalized
+
+
+async def _search_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Route search requests to the configured provider and normalize the result."""
+
+    settings = get_settings()
+    try:
+        provider = settings.determine_search_provider()
+    except ValueError as exc:
+        raise SearchProviderError(str(exc)) from exc
+
+    if provider == "serper":
+        endpoint = SERPER_ENDPOINTS.get(kind)
+        if not endpoint:
+            raise SearchProviderError(f"Unsupported Serper request type: {kind}")
+        response = await _serper_request(endpoint, payload)
+    elif provider == "serpapi":
+        response = await _serpapi_request(kind, payload)
+    else:
+        raise SearchProviderError(f"Unsupported search provider: {provider}")
+
+    return _normalize_search_results(provider, kind, response)
 
 
 async def search_company_profile(target_url: str) -> Dict[str, Any]:
@@ -60,7 +173,7 @@ async def search_company_profile(target_url: str) -> Dict[str, Any]:
     domain = extract_domain(target_url)
     query = f"About {domain or target_url}"
     payload = {"q": query, "num": 10}
-    return await _serper_request(SERPER_ENDPOINTS["search"], payload)
+    return await _search_request("search", payload)
 
 
 async def search_company_competitors(company_name: str) -> Dict[str, Any]:
@@ -68,7 +181,7 @@ async def search_company_competitors(company_name: str) -> Dict[str, Any]:
 
     query = f"Top competitors of {company_name}"
     payload = {"q": query, "num": 10}
-    return await _serper_request(SERPER_ENDPOINTS["search"], payload)
+    return await _search_request("search", payload)
 
 
 async def search_company_news(company_name: str, limit: int = 5) -> Dict[str, Any]:
@@ -76,7 +189,7 @@ async def search_company_news(company_name: str, limit: int = 5) -> Dict[str, An
 
     query = f"Latest news about {company_name}"
     payload = {"q": query, "num": limit}
-    return await _serper_request(SERPER_ENDPOINTS["news"], payload)
+    return await _search_request("news", payload)
 
 
 def parse_competitor_candidates(
@@ -85,10 +198,14 @@ def parse_competitor_candidates(
     target_domain: Optional[str] = None,
     limit: int = 5,
 ) -> List[Dict[str, Any]]:
-    """Extract competitor candidates from Serper search results."""
+    """Extract competitor candidates from provider-agnostic search results."""
 
-    organic_results = search_results.get("organic", [])
-    knowledge_graph = search_results.get("knowledgeGraph", {})
+    organic_results = search_results.get("organic") or search_results.get(
+        "organic_results", []
+    )
+    knowledge_graph = search_results.get("knowledgeGraph") or search_results.get(
+        "knowledge_graph", {}
+    )
     competitors: List[Dict[str, Any]] = []
 
     def _is_duplicate(url: Optional[str]) -> bool:
@@ -135,10 +252,14 @@ def parse_competitor_candidates(
 
 
 def parse_company_overview(search_results: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract company overview data from Serper search results."""
+    """Extract company overview data from provider-agnostic search results."""
 
-    knowledge_graph = search_results.get("knowledgeGraph", {})
-    organic = search_results.get("organic", [])
+    knowledge_graph = search_results.get("knowledgeGraph") or search_results.get(
+        "knowledge_graph", {}
+    )
+    organic = search_results.get("organic") or search_results.get(
+        "organic_results", []
+    )
     people_search = knowledge_graph.get("peopleAlsoSearchFor", [])
 
     overview = {
@@ -154,7 +275,7 @@ def parse_company_overview(search_results: Dict[str, Any]) -> Dict[str, Any]:
 
 
 __all__ = [
-    "SerperError",
+    "SearchProviderError",
     "search_company_profile",
     "search_company_competitors",
     "search_company_news",
