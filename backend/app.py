@@ -16,6 +16,23 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Competitive Battlecard Generator")
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://candicesxc.github.io",
+        "https://candicesxc.github.io/competitive-battlecard-ai",
+        "https://candicesxc.github.io"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 app.add_middleware(
     CORSMiddleware,
