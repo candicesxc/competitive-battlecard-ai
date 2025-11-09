@@ -83,13 +83,30 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const formData = new FormData(form);
-  const rawUrl = (formData.get("company_url") || "").trim();
-  const companyUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+  const rawUrl = (formData.get("company_url") || "").toString().trim();
 
   hideError();
-  showStatus("Gathering competitive intelligence…");
+  hideStatus();
   resultsCard.classList.add("hidden");
   battlecardContainer.innerHTML = "";
+
+  if (!rawUrl) {
+    showError("Please enter a company URL.");
+    return;
+  }
+
+  const normalizedUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+  let companyUrl;
+
+  try {
+    companyUrl = new URL(normalizedUrl).toString();
+  } catch (error) {
+    console.error("Invalid URL provided", error);
+    showError("Please enter a valid company URL.");
+    return;
+  }
+
+  showStatus("Gathering competitive intelligence…");
 
   try {
     const response = await fetch("/analyze", {
