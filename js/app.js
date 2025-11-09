@@ -1,12 +1,88 @@
 const DEFAULT_BACKEND_URL = "https://competitive-battlecard-ai.onrender.com";
 const LOCAL_BACKEND_URL = "http://localhost:8000";
+const BACKEND_STORAGE_KEY = "battlecard-backend-base-url";
 
-const BACKEND_BASE_URL =
-  window.BACKEND_BASE_URL ||
-  (window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1"
-    ? LOCAL_BACKEND_URL
-    : DEFAULT_BACKEND_URL);
+const sanitizeBaseUrl = (value) => {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return url.origin;
+    }
+  } catch (error) {
+    console.warn("Invalid backend URL provided", error);
+  }
+
+  return null;
+};
+
+const loadStoredBackendUrl = () => {
+  try {
+    const storedValue = window.localStorage?.getItem(BACKEND_STORAGE_KEY);
+    return sanitizeBaseUrl(storedValue);
+  } catch (error) {
+    console.warn("Unable to read stored backend URL", error);
+    return null;
+  }
+};
+
+const persistBackendUrl = (value) => {
+  const sanitized = sanitizeBaseUrl(value);
+  if (!sanitized) return null;
+
+  try {
+    window.localStorage?.setItem(BACKEND_STORAGE_KEY, sanitized);
+  } catch (error) {
+    console.warn("Unable to store backend URL", error);
+  }
+
+  return sanitized;
+};
+
+const inferBackendUrl = () => {
+  const globalOverride = sanitizeBaseUrl(window.BACKEND_BASE_URL);
+  if (globalOverride) return globalOverride;
+
+  const params = new URLSearchParams(window.location.search);
+  const queryOverride = sanitizeBaseUrl(params.get("backend"));
+  if (queryOverride) {
+    persistBackendUrl(queryOverride);
+
+    params.delete("backend");
+    const newQuery = params.toString();
+    const newUrl = `${window.location.pathname}${
+      newQuery ? `?${newQuery}` : ""
+    }${window.location.hash}`;
+    window.history.replaceState(null, "", newUrl);
+
+    return queryOverride;
+  }
+
+  const storedOverride = loadStoredBackendUrl();
+  if (storedOverride) return storedOverride;
+
+  const metaOverride = document
+    .querySelector('meta[name="backend-base-url"]')
+    ?.getAttribute("content");
+  const sanitizedMeta = sanitizeBaseUrl(metaOverride);
+  if (sanitizedMeta) return sanitizedMeta;
+
+  if (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+  ) {
+    return LOCAL_BACKEND_URL;
+  }
+
+  if (window.location.hostname.endsWith(".onrender.com")) {
+    return window.location.origin;
+  }
+
+  return DEFAULT_BACKEND_URL;
+};
+
+const BACKEND_BASE_URL = inferBackendUrl();
 
 const selectors = {
   form: document.getElementById("analyze-form"),
