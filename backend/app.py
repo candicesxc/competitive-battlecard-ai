@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 origins = [
@@ -12,9 +15,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-from __future__ import annotations
 
 import logging
 from typing import Any, Dict
