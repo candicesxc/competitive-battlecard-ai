@@ -4,8 +4,7 @@ import asyncio
 import json
 import logging
 import re
-from collections import Counter
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -319,28 +318,6 @@ async def fetch_page_text(url: str) -> str:
     return text[:6000]
 
 
-def _fallback_candidate_profile(candidate: Dict[str, Any]) -> Dict[str, Any]:
-    """Return a minimal profile when enrichment data is unavailable."""
-
-    snippet = candidate.get("snippet") or ""
-    query_hint = candidate.get("query") or ""
-    summary_parts = [snippet.strip()] if snippet else []
-    if query_hint:
-        summary_parts.append(
-            f"Identified via web search for '{query_hint}'."
-        )
-    summary = " ".join(summary_parts) or "Discovered via targeted web search."
-
-    return {
-        "industry": candidate.get("industry") or "",
-        "company_size": candidate.get("company_size") or "unknown",
-        "business_model": candidate.get("business_model") or "unknown",
-        "target_audience": candidate.get("target_audience") or "",
-        "core_products": candidate.get("core_products") or [],
-        "summary": summary[:400],
-    }
-
-
 def _build_fallback_profile(page_text: str, url: str) -> Dict[str, Any]:
     """Return a minimal profile when the structured prompt cannot be parsed."""
 
@@ -509,12 +486,7 @@ async def enrich_candidate_profiles(
 
         page_text = await fetch_page_text(homepage)
         if not page_text:
-            logger.debug(
-                "No homepage content for %s; using fallback mini profile.",
-                homepage,
-            )
-            profile = _fallback_candidate_profile(candidate)
-            return {**candidate, "profile": profile, "website": homepage}
+            return None
 
         messages = [
             {"role": "system", "content": "You are an expert B2B market analyst."},
@@ -735,14 +707,11 @@ async def score_and_label_competitors(
         )
     except AnalysisError as exc:
         logger.warning("Competitor scoring failed: %s", exc)
-        result = []
-    except Exception as exc:  # noqa: BLE001 - unexpected parsing issues
-        logger.warning("Unexpected competitor scoring error: %s", exc)
-        result = []
+        return [], 1
 
     if not isinstance(result, list):
         logger.warning("Competitor scoring returned non-list payload")
-        result = []
+        return [], 1
 
     ranking: List[Dict[str, Any]] = []
     by_domain: Dict[str, Dict[str, Any]] = {}
