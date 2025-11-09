@@ -44,7 +44,7 @@ async def _serper_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, A
         raise SearchProviderError("Serper API key is not configured.")
 
     headers = {
-        "X-API-KEY": settings.serper_api_key.get_secret_value(),
+        "X-API-KEY": api_key,
         "Content-Type": "application/json",
     }
 
