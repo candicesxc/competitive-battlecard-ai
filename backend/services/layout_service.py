@@ -2,13 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional
 
-from ..config import get_settings
-
-settings = get_settings()
-
-_DEFAULT_LOGO = "img/logo_fallback.png"
-
-
 def _ensure_iterable(items: Optional[Iterable[str]]) -> List[str]:
     if not items:
         return []
@@ -17,28 +10,17 @@ def _ensure_iterable(items: Optional[Iterable[str]]) -> List[str]:
     return [str(items).strip()]
 
 
-def _resolve_logo_url(company: Dict[str, Any]) -> str:
-    logo = company.get("logo_url")
-    if isinstance(logo, str) and logo.strip():
-        return logo
+def _score_company(
+    strengths: List[str], weaknesses: List[str], fallback: Optional[Any] = None
+) -> int:
+    if fallback is not None:
+        try:
+            score_value = float(fallback)
+            return max(1, min(10, round(score_value)))
+        except (TypeError, ValueError):
+            pass
 
-    website = company.get("website") or company.get("url")
-    if isinstance(website, str) and website.strip():
-        sanitized = (
-            website.replace("https://", "")
-            .replace("http://", "")
-            .replace("www.", "")
-            .strip("/")
-        )
-        if sanitized:
-            return f"{settings.clearbit_logo_base}{sanitized}"
-
-    return _DEFAULT_LOGO
-
-
-def _score_company(strengths: List[str], weaknesses: List[str]) -> int:
-    base_score = 6
-    score = base_score + len(strengths) - len(weaknesses)
+    score = (len(strengths) * 2) - len(weaknesses)
     return max(1, min(10, score))
 
 
@@ -54,7 +36,6 @@ def _prepare_company_payload(company: Dict[str, Any], *, include_strategy: bool)
         "company_name": company.get("company_name")
         or company.get("name")
         or "Company",
-        "logo_url": _resolve_logo_url(company),
         "overview": company.get("overview") or "",
         "products": _ensure_iterable(company.get("products")),
         "pricing": _ensure_iterable(company.get("pricing")),
@@ -65,15 +46,26 @@ def _prepare_company_payload(company: Dict[str, Any], *, include_strategy: bool)
         "category": company.get("category") or "",
         "website": company.get("website") or "",
         "news": company.get("news") or [],
+        "summary": company.get("summary") or "",
     }
 
+    if include_strategy:
+        prepared["competitor_type"] = company.get("competitor_type") or ""
+        prepared["why_similar"] = company.get("why_similar") or ""
+        prepared["similarity_breakdown"] = {
+            "industry": company.get("industry_similarity"),
+            "product": company.get("product_similarity"),
+            "audience": company.get("audience_similarity"),
+            "size": company.get("size_similarity"),
+            "business_model": company.get("business_model_similarity"),
+        }
+
     score = company.get("score_vs_target")
-    if score is None:
-        score = _score_company(strengths, weaknesses)
-    try:
-        prepared["score_vs_target"] = int(score)
-    except (TypeError, ValueError):
-        prepared["score_vs_target"] = _score_company(strengths, weaknesses)
+    prepared["score_vs_target"] = _score_company(
+        strengths,
+        weaknesses,
+        fallback=score,
+    )
 
     return prepared
 

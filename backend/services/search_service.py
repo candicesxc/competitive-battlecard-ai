@@ -120,6 +120,13 @@ async def search_company_profile(target_url: str) -> Dict[str, Any]:
     return await _search_request("search", payload)
 
 
+async def generic_company_search(query: str, *, num: int = 10) -> Dict[str, Any]:
+    """Run a generic search query using the configured provider."""
+
+    payload = {"q": query, "num": num}
+    return await _search_request("search", payload)
+
+
 async def search_company_competitors(company_name: str) -> Dict[str, Any]:
     """Retrieve competitor information for the given company name."""
 
@@ -222,6 +229,7 @@ def parse_company_overview(search_results: Dict[str, Any]) -> Dict[str, Any]:
 __all__ = [
     "SearchProviderError",
     "search_company_profile",
+    "generic_company_search",
     "search_company_competitors",
     "search_company_news",
     "parse_competitor_candidates",
