@@ -40,8 +40,7 @@ async def _serper_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, A
     """Perform a POST request to the Serper API and return the JSON body."""
 
     settings = get_settings()
-    api_key = settings._clean_secret(settings.serper_api_key)
-    if not api_key:
+    if not settings.serper_api_key:
         raise SearchProviderError("Serper API key is not configured.")
 
     headers = {
@@ -72,8 +71,7 @@ async def _serpapi_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]
     """Perform a GET request to the SerpAPI service and return the JSON body."""
 
     settings = get_settings()
-    api_key = settings._clean_secret(settings.serpapi_api_key)
-    if not api_key:
+    if not settings.serpapi_api_key:
         raise SearchProviderError("SerpAPI key is not configured.")
 
     engine = SERPAPI_ENGINES.get(kind)
@@ -81,7 +79,7 @@ async def _serpapi_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]
         raise SearchProviderError(f"Unsupported SerpAPI request type: {kind}")
 
     params = {
-        "api_key": api_key,
+        "api_key": settings.serpapi_api_key.get_secret_value(),
         "engine": engine,
         **payload,
     }

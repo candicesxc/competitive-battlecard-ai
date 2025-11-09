@@ -17,25 +17,14 @@ class Settings(BaseSettings):
     strategist_model: str = "gpt-4o-mini"
     analyst_model: str = "gpt-4o-mini"
 
-    @staticmethod
-    def _clean_secret(secret: Optional[SecretStr]) -> Optional[str]:
-        """Return a stripped secret value or ``None`` when empty."""
-
-        if not secret:
-            return None
-        value = secret.get_secret_value().strip()
-        return value or None
-
     def determine_search_provider(self) -> Literal["serper", "serpapi"]:
         """Return the configured search provider based on environment variables."""
 
         if self.search_provider:
             return self.search_provider
-        serper_key = self._clean_secret(self.serper_api_key)
-        if serper_key:
+        if self.serper_api_key:
             return "serper"
-        serpapi_key = self._clean_secret(self.serpapi_api_key)
-        if serpapi_key:
+        if self.serpapi_api_key:
             return "serpapi"
         raise ValueError(
             "No search provider configured. Provide SERPER_API_KEY or SERPAPI_API_KEY."
