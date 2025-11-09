@@ -10,11 +10,6 @@ from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
-SERPER_ENDPOINTS = {
-    "search": "https://google.serper.dev/search",
-    "news": "https://google.serper.dev/news",
-}
-
 SERPAPI_ENDPOINT = "https://serpapi.com/search"
 SERPAPI_ENGINES = {
     "search": "google",
@@ -34,41 +29,6 @@ def extract_domain(url: str) -> Optional[str]:
     except ValueError:
         logger.debug("Failed to parse URL for domain extraction: %s", url)
     return None
-
-
-async def _serper_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Perform a POST request to the Serper API and return the JSON body."""
-
-    settings = get_settings()
-    if not settings.serper_api_key:
-        raise SearchProviderError("Serper API key is not configured.")
-
-    endpoint = SERPER_ENDPOINTS.get(kind)
-    if not endpoint:
-        raise SearchProviderError(f"Unsupported Serper request type: {kind}")
-
-    headers = {
-        "X-API-KEY": settings.serper_api_key.get_secret_value(),
-        "Content-Type": "application/json",
-    }
-
-    async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
-        try:
-            response = await client.post(endpoint, json=payload, headers=headers)
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            body = exc.response.text
-            logger.error(
-                "Serper API returned error %s: %s", exc.response.status_code, body
-            )
-            raise SearchProviderError(
-                f"Search provider 'serper' returned error {exc.response.status_code}"
-            ) from exc
-        except httpx.HTTPError as exc:
-            logger.exception("Serper API request failed")
-            raise SearchProviderError("Search provider 'serper' request failed") from exc
-
-    return response.json()
 
 
 async def _serpapi_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -107,13 +67,8 @@ async def _serpapi_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]
     return response.json()
 
 
-def _normalize_search_results(
-    provider: str, kind: str, response: Dict[str, Any]
-) -> Dict[str, Any]:
-    """Normalize provider-specific payload differences."""
-
-    if provider != "serpapi":
-        return response
+def _normalize_search_results(kind: str, response: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize SerpAPI payload differences."""
 
     normalized: Dict[str, Any] = dict(response)
 
@@ -150,22 +105,10 @@ def _normalize_search_results(
 
 
 async def _search_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Route search requests to the configured provider and normalize the result."""
+    """Route search requests to SerpAPI and normalize the result."""
 
-    settings = get_settings()
-    try:
-        provider = settings.determine_search_provider()
-    except ValueError as exc:
-        raise SearchProviderError(str(exc)) from exc
-
-    if provider == "serper":
-        response = await _serper_request(kind, payload)
-    elif provider == "serpapi":
-        response = await _serpapi_request(kind, payload)
-    else:
-        raise SearchProviderError(f"Unsupported search provider: {provider}")
-
-    return _normalize_search_results(provider, kind, response)
+    response = await _serpapi_request(kind, payload)
+    return _normalize_search_results(kind, response)
 
 
 async def search_company_profile(target_url: str) -> Dict[str, Any]:
