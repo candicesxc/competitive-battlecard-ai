@@ -1,18 +1,29 @@
 from functools import lru_cache
-from pydantic_settings import BaseSettings
-from pydantic import HttpUrl, SecretStr
+from typing import Optional
 
+from pydantic import HttpUrl, SecretStr
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Application configuration loaded from environment variables."""
 
     openai_api_key: SecretStr
-    serper_api_key: SecretStr
+    serpapi_api_key: Optional[SecretStr] = None
     clearbit_logo_base: HttpUrl = "https://logo.clearbit.com/"  # type: ignore[assignment]
     openai_model: str = "gpt-4.1-mini"
     strategist_model: str = "gpt-4o-mini"
     analyst_model: str = "gpt-4o-mini"
+
+    @staticmethod
+    def _clean_secret(secret: Optional[SecretStr]) -> Optional[str]:
+        """Return a stripped secret value or ``None`` when empty."""
+
+        if not secret:
+            return None
+        value = secret.get_secret_value().strip()
+        return value or None
+
 
     class Config:
         env_prefix = ""
