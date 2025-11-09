@@ -452,8 +452,12 @@ async def fetch_candidate_companies(profile: Dict[str, Any]) -> List[Dict[str, A
                 continue
 
             seen_domains.add(domain)
+            readable_name = _clean_result_title(item.get("title"))
+            if not readable_name and domain:
+                readable_name = domain.split(".")[0].replace("-", " ").title()
+
             result = {
-                "name": _clean_result_title(item.get("title")),
+                "name": readable_name,
                 "website": url,
                 "snippet": snippet,
                 "source_url": url,
@@ -509,10 +513,15 @@ async def enrich_candidate_profiles(
             logger.warning(
                 "Candidate profiling failed for %s: %s", homepage, exc
             )
-            return None
+            profile = _fallback_candidate_profile({**candidate, "website": homepage})
+        except Exception as exc:  # noqa: BLE001 - unexpected parsing issues
+            logger.warning(
+                "Unexpected error profiling candidate %s: %s", homepage, exc
+            )
+            profile = _fallback_candidate_profile({**candidate, "website": homepage})
 
         if not isinstance(profile, dict):
-            return None
+            profile = _fallback_candidate_profile({**candidate, "website": homepage})
 
         enriched = {**candidate, "profile": profile, "website": homepage}
         return enriched
@@ -528,7 +537,128 @@ async def enrich_candidate_profiles(
         if result:
             enriched_candidates.append(result)
 
+    if not enriched_candidates:
+        logger.warning(
+            "Candidate enrichment returned no profiles; using fallback metadata."
+        )
+        return [
+            {**candidate, "profile": _fallback_candidate_profile(candidate)}
+            for candidate in candidates
+        ]
+
     return enriched_candidates
+
+
+def _tokenize_terms(*values: Iterable[str]) -> Counter:
+    """Tokenize strings into a lowercase word counter for lightweight matching."""
+
+    tokens: Counter[str] = Counter()
+    for value in values:
+        for text in value:
+            if not text:
+                continue
+            words = re.findall(r"[a-z0-9]+", str(text).lower())
+            tokens.update(words)
+    return tokens
+
+
+def _fallback_similarity_scores(
+    target_profile: Dict[str, Any],
+    candidate: Dict[str, Any],
+) -> Dict[str, float]:
+    """Estimate similarity scores heuristically when LLM scoring is unavailable."""
+
+    profile = candidate.get("profile") or {}
+    target_tokens = _tokenize_terms(
+        [target_profile.get("industry", "")],
+        [target_profile.get("sub_industry", "")],
+        target_profile.get("keywords", []) or [],
+        target_profile.get("core_products", []) or [],
+        [target_profile.get("target_audience", "")],
+    )
+    candidate_tokens = _tokenize_terms(
+        [profile.get("industry", "")],
+        profile.get("core_products", []) or [],
+        [profile.get("summary", "")],
+        [candidate.get("snippet", "")],
+    )
+
+    overlap = sum((target_tokens & candidate_tokens).values())
+
+    def _score_from_match(match: bool, base: float = 25.0) -> float:
+        return 70.0 if match else base
+
+    industry_match = False
+    target_industry = (target_profile.get("industry") or "").lower()
+    candidate_industry = (profile.get("industry") or "").lower()
+    if target_industry and candidate_industry:
+        industry_match = target_industry in candidate_industry or candidate_industry in target_industry
+
+    target_audience_tokens = _tokenize_terms(
+        [target_profile.get("target_audience", "")]
+    )
+    candidate_audience_tokens = _tokenize_terms(
+        [profile.get("target_audience", "")]
+    )
+    audience_overlap = sum(
+        (target_audience_tokens & candidate_audience_tokens).values()
+    )
+
+    product_match = False
+    target_products = [p.lower() for p in target_profile.get("core_products", []) or []]
+    candidate_products = [p.lower() for p in profile.get("core_products", []) or []]
+    if target_products and candidate_products:
+        product_match = any(tp in cp or cp in tp for tp in target_products for cp in candidate_products)
+
+    business_model_match = (
+        target_profile.get("business_model")
+        and profile.get("business_model")
+        and target_profile.get("business_model") == profile.get("business_model")
+    )
+
+    size_match = (
+        target_profile.get("company_size")
+        and profile.get("company_size")
+        and target_profile.get("company_size") == profile.get("company_size")
+    )
+
+    industry_similarity = _score_from_match(industry_match)
+    product_similarity = _score_from_match(product_match, base=30.0)
+    audience_similarity = 30.0 + min(40.0, float(overlap * 5))
+    if audience_overlap:
+        audience_similarity = max(audience_similarity, 60.0)
+    size_similarity = 60.0 if size_match else 30.0
+    business_model_similarity = 70.0 if business_model_match else 35.0
+
+    similarity_score = (
+        industry_similarity
+        + product_similarity
+        + audience_similarity
+        + size_similarity
+        + business_model_similarity
+    ) / 5.0
+
+    return {
+        "industry_similarity": industry_similarity,
+        "product_similarity": product_similarity,
+        "audience_similarity": audience_similarity,
+        "size_similarity": size_similarity,
+        "business_model_similarity": business_model_similarity,
+        "similarity_score": similarity_score,
+    }
+
+
+def _fallback_competitor_type(score_bundle: Dict[str, float]) -> str:
+    """Infer competitor type from heuristic similarity scores."""
+
+    similarity = score_bundle.get("similarity_score", 0)
+    if similarity >= 70:
+        return "direct"
+    if similarity >= 55:
+        return "adjacent"
+    if similarity >= 45:
+        return "aspirational"
+    return "adjacent"
 
 
 def _prepare_ranking_payload(target_profile: Dict[str, Any], candidates: List[Dict[str, Any]]):
@@ -631,6 +761,37 @@ async def score_and_label_competitors(
         )
 
         ranking.append(competitor_payload)
+
+    if not ranking:
+        logger.warning(
+            "LLM scoring returned no relevant competitors; using heuristic fallback."
+        )
+        fallback_ranking: List[Dict[str, Any]] = []
+        for candidate in trimmed_candidates[:limit]:
+            scores = _fallback_similarity_scores(target_profile, candidate)
+            competitor_type = _fallback_competitor_type(scores)
+            reason = candidate.get("snippet") or candidate.get("profile", {}).get(
+                "summary", ""
+            )
+            fallback_ranking.append(
+                {
+                    **candidate,
+                    **scores,
+                    "competitor_type": competitor_type,
+                    "reason_for_similarity": reason
+                    or "Identified via targeted web search and heuristic overlap.",
+                    "competitive_score": max(
+                        1, min(10, round(scores["similarity_score"] / 10.0))
+                    ),
+                }
+            )
+
+        best_similarity = max(
+            (item.get("similarity_score", 0) or 0 for item in fallback_ranking),
+            default=0,
+        )
+        competitive_score_10 = max(1, min(10, round(best_similarity / 10.0)))
+        return fallback_ranking, competitive_score_10
 
     ranking.sort(key=lambda item: item.get("similarity_score", 0), reverse=True)
     ranking = ranking[:limit]
