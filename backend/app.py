@@ -1,49 +1,14 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-from .crew_agents import BattlecardCrew
-from .models import AnalyzeRequest
-from .services import analysis_service, layout_service, search_service
-
-app = FastAPI()
-
-# CORS settings
-origins = [
-    "https://candicesxc.github.io",
-    "https://candicesxc.github.io/competitive-battlecard-ai",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-@app.post("/analyze")
-async def analyze(request: AnalyzeRequest):
-    # this is just a sketch – keep whatever logic you already had
-    result = await analysis_service.run_analysis(request.company_url)
-    return result
-    
-
-
 import logging
 from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, HttpUrl
 
 from .crew_agents import BattlecardCrew
+from .models import AnalyzeRequest
 from .services.analysis_service import AnalysisError
 from .services.search_service import SearchProviderError
 
@@ -51,36 +16,25 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Competitive Battlecard Generator")
-app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://candicesxc.github.io",
         "https://candicesxc.github.io/competitive-battlecard-ai",
-        "https://candicesxc.github.io"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+# Instantiate once at startup so we can reuse the same crew across requests.
 battlecard_crew = BattlecardCrew()
 
 
-class AnalyzeRequest(BaseModel):
-    company_url: HttpUrl
+@app.get("/health")
+async def health() -> Dict[str, str]:
+    return {"status": "ok"}
 
 
 @app.post("/analyze")
@@ -125,4 +79,3 @@ if __name__ == "__main__":
         port=int(os.getenv("PORT", "8000")),
         reload=False,
     )
-
