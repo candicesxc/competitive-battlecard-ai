@@ -92,6 +92,9 @@ const selectors = {
   errorBanner: document.getElementById("error-banner"),
   errorText: document.getElementById("error-text"),
   loadingState: document.getElementById("loading-state"),
+  progressFill: document.getElementById("progress-fill"),
+  progressValue: document.getElementById("progress-value"),
+  progressMessage: document.getElementById("progress-message"),
   results: document.getElementById("results"),
 };
 
@@ -111,11 +114,91 @@ const toggleClass = (element, className, shouldAdd) => {
 };
 
 let isLoading = false;
+let progress = 0;
+let progressTimer = null;
+
+const getProgressMessage = (value) => {
+  if (value < 30) return "Analyzing company website…";
+  if (value < 60) return "Searching for relevant competitors…";
+  if (value < 90) return "Scoring and ranking competitors…";
+  if (value < 100) return "Generating final battlecard…";
+  return "Generating final battlecard…";
+};
+
+const updateProgressUI = () => {
+  if (selectors.progressFill) {
+    selectors.progressFill.style.width = `${progress}%`;
+  }
+  if (selectors.progressValue) {
+    selectors.progressValue.textContent = `${Math.round(progress)}%`;
+  }
+  if (selectors.progressMessage) {
+    selectors.progressMessage.textContent = getProgressMessage(progress);
+  }
+};
+
+const setProgress = (value) => {
+  progress = Math.max(0, Math.min(100, Number(value) || 0));
+  updateProgressUI();
+};
+
+const stopProgressTimer = () => {
+  if (progressTimer) {
+    window.clearInterval(progressTimer);
+    progressTimer = null;
+  }
+};
+
+const startProgressTimer = () => {
+  stopProgressTimer();
+  progressTimer = window.setInterval(() => {
+    if (!isLoading) {
+      stopProgressTimer();
+      return;
+    }
+    if (progress >= 95) {
+      return;
+    }
+    let increment = 0.5;
+    if (progress < 30) {
+      increment = 3;
+    } else if (progress < 60) {
+      increment = 2;
+    } else if (progress < 80) {
+      increment = 1.5;
+    } else {
+      increment = 0.75;
+    }
+    setProgress(Math.min(progress + increment, 95));
+  }, 500);
+};
 
 const setLoading = (loading) => {
-  isLoading = Boolean(loading);
-  toggleClass(selectors.loadingState, "hidden", !isLoading);
-  selectors.submitBtn.disabled = isLoading;
+  if (loading) {
+    if (isLoading) return;
+    isLoading = true;
+    toggleClass(selectors.loadingState, "hidden", false);
+    if (selectors.submitBtn) {
+      selectors.submitBtn.disabled = true;
+    }
+    setProgress(5);
+    startProgressTimer();
+    return;
+  }
+
+  if (!isLoading) return;
+
+  setProgress(100);
+  stopProgressTimer();
+
+  window.setTimeout(() => {
+    isLoading = false;
+    if (selectors.submitBtn) {
+      selectors.submitBtn.disabled = false;
+    }
+    toggleClass(selectors.loadingState, "hidden", true);
+    setProgress(0);
+  }, 600);
 };
 
 const clearError = () => {

@@ -91,6 +91,7 @@ class BattlecardCrew:
 
         target_profile: Dict[str, Any] = {}
         ranked_competitors: List[Dict[str, Any]] = []
+        competitive_score_10 = 1
 
         try:
             if target_page_text:
@@ -102,13 +103,16 @@ class BattlecardCrew:
                 logger.warning("No homepage content available for %s", website)
 
             if target_profile:
-                candidates = await competitor_pipeline.fetch_candidate_competitors(
+                candidates = await competitor_pipeline.fetch_candidate_companies(
                     target_profile
                 )
-                enriched_candidates = await competitor_pipeline.enrich_candidates_with_profile(
+                enriched_candidates = await competitor_pipeline.enrich_candidate_profiles(
                     candidates
                 )
-                ranked_competitors = await competitor_pipeline.score_and_rank_competitors(
+                (
+                    ranked_competitors,
+                    competitive_score_10,
+                ) = await competitor_pipeline.score_and_label_competitors(
                     target_profile,
                     enriched_candidates,
                 )
@@ -159,12 +163,13 @@ class BattlecardCrew:
                         "size_similarity": 0.0,
                         "business_model_similarity": 0.0,
                         "competitor_type": "adjacent",
-                        "why_similar": candidate.get("snippet")
+                        "reason_for_similarity": candidate.get("snippet")
                         or "Identified via general search results.",
                         "competitive_score": 1,
                     }
                     for candidate in fallback_candidates
                 ][:5]
+                competitive_score_10 = max(competitive_score_10, 1)
             except Exception as exc:  # noqa: BLE001 - fallback should not fail request
                 logger.warning("Fallback competitor discovery failed: %s", exc)
                 ranked_competitors = []
@@ -175,6 +180,7 @@ class BattlecardCrew:
             "target_search_payload": profile,
             "competitors": ranked_competitors,
             "target_url": target_url,
+            "competitive_score_10": competitive_score_10,
         }
 
     async def _collect_company_research(
@@ -283,6 +289,7 @@ class BattlecardCrew:
             "target": target_company,
             "target_profile": target_profile,
             "competitors": competitors_data,
+            "competitive_score_10": research.get("competitive_score_10"),
         }
 
     async def _run_analyst_agent(self, enriched: Dict[str, Any]) -> Dict[str, Any]:
@@ -320,6 +327,17 @@ class BattlecardCrew:
         target_payload.setdefault("pricing_tier", pipeline_profile.get("pricing_tier"))
         target_payload.setdefault("keywords", pipeline_profile.get("keywords", []))
         target_payload["profile_metadata"] = pipeline_profile
+        competition_intensity = enriched.get("competitive_score_10")
+        if competition_intensity is not None:
+            try:
+                target_payload["score_vs_target"] = max(
+                    1, min(10, int(competition_intensity))
+                )
+            except (TypeError, ValueError):
+                logger.debug(
+                    "Unable to coerce competition intensity '%s' to int",
+                    competition_intensity,
+                )
         target_payload.setdefault("score_vs_target", 10)
 
         competitor_results: List[Dict[str, Any]] = []
@@ -371,7 +389,13 @@ class BattlecardCrew:
         }
 
         result["competitor_type"] = metadata.get("competitor_type") or ""
-        result["why_similar"] = metadata.get("why_similar") or ""
+        reason = (
+            metadata.get("reason_for_similarity")
+            or metadata.get("why_similar")
+            or ""
+        )
+        result["reason_for_similarity"] = reason
+        result["why_similar"] = reason
         result["similarity_score"] = metadata.get("similarity_score")
         result["industry_similarity"] = metadata.get("industry_similarity")
         result["product_similarity"] = metadata.get("product_similarity")

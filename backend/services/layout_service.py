@@ -51,7 +51,13 @@ def _prepare_company_payload(company: Dict[str, Any], *, include_strategy: bool)
 
     if include_strategy:
         prepared["competitor_type"] = company.get("competitor_type") or ""
-        prepared["why_similar"] = company.get("why_similar") or ""
+        reason = (
+            company.get("reason_for_similarity")
+            or company.get("why_similar")
+            or ""
+        )
+        prepared["reason_for_similarity"] = reason
+        prepared["why_similar"] = reason
         prepared["similarity_breakdown"] = {
             "industry": company.get("industry_similarity"),
             "product": company.get("product_similarity"),
