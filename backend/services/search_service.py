@@ -10,9 +10,10 @@ from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
-SERPER_ENDPOINTS = {
-    "search": "https://google.serper.dev/search",
-    "news": "https://google.serper.dev/news",
+SERPAPI_ENDPOINT = "https://serpapi.com/search"
+SERPAPI_ENGINES = {
+    "search": "google",
+    "news": "google_news",
 }
 
 SERPAPI_ENDPOINT = "https://serpapi.com/search"
@@ -36,8 +37,8 @@ def extract_domain(url: str) -> Optional[str]:
     return None
 
 
-async def _serper_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Perform a POST request to the Serper API and return the JSON body."""
+async def _serpapi_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Perform a GET request to the SerpAPI service and return the JSON body."""
 
     settings = get_settings()
     if not settings.serper_api_key:
@@ -50,7 +51,7 @@ async def _serper_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, A
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
         try:
-            response = await client.post(endpoint, headers=headers, json=payload)
+            response = await client.get(SERPAPI_ENDPOINT, params=params)
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             body = exc.response.text
