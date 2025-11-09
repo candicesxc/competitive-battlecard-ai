@@ -1,3 +1,0 @@
-"""Competitive Battlecard Generator package."""
-
-

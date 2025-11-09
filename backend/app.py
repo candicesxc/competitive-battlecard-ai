@@ -1,25 +1,19 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, HttpUrl
 
-from .config import get_settings
 from .crew_agents import BattlecardCrew
 from .services.analysis_service import AnalysisError
 from .services.search_service import SerperError
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-
-BASE_DIR = Path(__file__).resolve().parent
 
 app = FastAPI(title="Competitive Battlecard Generator")
 
@@ -30,27 +24,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount(
-    "/static",
-    StaticFiles(directory=BASE_DIR / "static"),
-    name="static",
-)
-
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-
-settings = get_settings()
 battlecard_crew = BattlecardCrew()
 
 
 class AnalyzeRequest(BaseModel):
     company_url: HttpUrl
-
-
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request) -> HTMLResponse:
-    """Render the landing page."""
-
-    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.post("/analyze")
@@ -72,7 +50,6 @@ async def analyze_company(payload: AnalyzeRequest) -> JSONResponse:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     response: Dict[str, Any] = {
-        "html": result.html,
         "target_company": result.target_company,
         "competitors": result.competitors,
         "market_summary": result.market_summary,
@@ -80,4 +57,20 @@ async def analyze_company(payload: AnalyzeRequest) -> JSONResponse:
 
     return JSONResponse(content=response)
 
+
+@app.get("/healthz", include_in_schema=False)
+async def healthcheck() -> Dict[str, str]:
+    return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    import os
+    import uvicorn
+
+    uvicorn.run(
+        "backend.app:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8000")),
+        reload=False,
+    )
 

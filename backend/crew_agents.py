@@ -28,7 +28,6 @@ class BattlecardResult:
     target_company: Dict[str, Any]
     competitors: List[Dict[str, Any]]
     market_summary: Optional[str] = None
-    html: str = ""
 
 
 class BattlecardCrew:
@@ -62,8 +61,8 @@ class BattlecardCrew:
         )
         self.designer_agent = Agent(
             role="Visual Storyteller",
-            goal="Deliver Zendesk-style battlecard HTML with Tailwind.",
-            backstory="A presentation expert turning research into polished enablement collateral.",
+            goal="Transform structured insights into a presentation-ready JSON layout.",
+            backstory="A presentation expert translating research into polished enablement collateral.",
         )
 
     async def run(self, target_url: str) -> BattlecardResult:
@@ -233,19 +232,18 @@ class BattlecardCrew:
         }
 
     async def _run_designer_agent(self, strategized: Dict[str, Any]) -> BattlecardResult:
-        logger.info("DesignerAgent: assembling final layout")
+        logger.info("DesignerAgent: assembling final payload")
 
-        html = layout_service.build_battlecard_html(
+        payload = layout_service.build_battlecard_payload(
             strategized["target"],
             strategized["competitors"],
             strategized.get("market_summary", ""),
         )
 
         return BattlecardResult(
-            target_company=strategized["target"],
-            competitors=strategized["competitors"],
-            market_summary=strategized.get("market_summary"),
-            html=html,
+            target_company=payload["target_company"],
+            competitors=payload["competitors"],
+            market_summary=payload.get("market_summary"),
         )
 
 
