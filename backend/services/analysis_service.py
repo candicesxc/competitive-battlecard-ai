@@ -18,17 +18,22 @@ class AnalysisError(RuntimeError):
     """Raised when OpenAI analysis requests fail."""
 
 
-async def _json_completion(messages: List[Dict[str, str]], model: Optional[str] = None) -> Dict[str, Any]:
-    """Call OpenAI to produce a JSON object and parse the response."""
+async def _json_completion(
+    messages: List[Dict[str, str]],
+    model: Optional[str] = None,
+    response_format: Optional[Dict[str, Any]] = None,
+) -> Any:
+    """Call OpenAI to produce a JSON payload and parse the response."""
 
     chosen_model = model or settings.openai_model
+    format_payload = response_format or {"type": "json_object"}
 
     try:
         response = await openai_client.chat.completions.create(
             model=chosen_model,
             messages=messages,
             temperature=0.2,
-            response_format={"type": "json_object"},
+            response_format=format_payload,
         )
     except Exception as exc:  # noqa: BLE001 - upstream exceptions are varied
         logger.exception("OpenAI request failed")
@@ -81,7 +86,7 @@ async def generate_company_profile(company_name: str, context: Dict[str, Any]) -
         "Return JSON with keys 'company_name', 'overview', 'products', 'pricing', and 'category'. "
         "'Products' should be a list of 2-3 strings formatted as 'Product Name – description'. "
         "'Pricing' should list 1-2 tiers if available, otherwise use general pricing insights. "
-        "Keep the tone professional and fact-based."
+        "Keep the tone professional and fact-based. Do not reference company logos or images."
     )
 
     messages = [
@@ -99,6 +104,7 @@ async def generate_company_profile(company_name: str, context: Dict[str, Any]) -
 
     result = await _json_completion(messages)
     result.setdefault("company_name", company_name)
+    result.pop("logo_url", None)
     return result
 
 

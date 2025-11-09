@@ -110,7 +110,10 @@ const toggleClass = (element, className, shouldAdd) => {
   element.classList[shouldAdd ? "add" : "remove"](className);
 };
 
-const setLoading = (isLoading) => {
+let isLoading = false;
+
+const setLoading = (loading) => {
+  isLoading = Boolean(loading);
   toggleClass(selectors.loadingState, "hidden", !isLoading);
   selectors.submitBtn.disabled = isLoading;
 };
@@ -125,15 +128,28 @@ const showError = (message) => {
   toggleClass(selectors.errorBanner, "hidden", false);
 };
 
-const sanitizeUrlInput = (value) => {
+const normalizeCompanyUrl = (value) => {
   const trimmed = value.trim();
   if (!trimmed) {
     return "";
   }
-  if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed;
+
+  let normalized = trimmed;
+  if (!/^https?:\/\//i.test(normalized)) {
+    normalized = `https://${normalized}`;
   }
-  return `https://${trimmed}`;
+
+  try {
+    const url = new URL(normalized);
+    const isSimpleDomain = url.hostname.split(".").length === 2;
+    if (!/^www\./i.test(url.hostname) && isSimpleDomain) {
+      url.hostname = `www.${url.hostname}`;
+    }
+    return url.toString();
+  } catch (error) {
+    console.warn("Unable to normalize URL", error);
+    return normalized;
+  }
 };
 
 const createSection = (title, items, accentClass) => {
@@ -220,17 +236,7 @@ const createTargetCard = (target, marketSummary) => {
     "flex flex-col gap-6 md:flex-row md:items-center md:justify-between";
 
   const companyInfo = document.createElement("div");
-  companyInfo.className = "flex items-center gap-4";
-
-  const logo = document.createElement("img");
-  logo.src = target.logo_url || "img/logo_fallback.png";
-  logo.alt = `${target.company_name || "Target"} logo`;
-  logo.className =
-    "h-16 w-16 rounded-xl border border-slate-200 bg-white object-contain";
-  logo.onerror = () => {
-    logo.onerror = null;
-    logo.src = "img/logo_fallback.png";
-  };
+  companyInfo.className = "flex flex-col gap-1";
 
   const titleWrapper = document.createElement("div");
   const title = document.createElement("h1");
@@ -241,7 +247,7 @@ const createTargetCard = (target, marketSummary) => {
   category.textContent = target.category || "";
 
   titleWrapper.append(title, category);
-  companyInfo.append(logo, titleWrapper);
+  companyInfo.appendChild(titleWrapper);
   header.appendChild(companyInfo);
 
   section.appendChild(header);
@@ -271,17 +277,7 @@ const createCompetitorCard = (competitor) => {
     "group rounded-3xl border border-slate-200 bg-white/95 p-6 shadow transition hover:-translate-y-1 hover:shadow-lg";
 
   const header = document.createElement("header");
-  header.className = "mb-5 flex items-center gap-4";
-
-  const logo = document.createElement("img");
-  logo.src = competitor.logo_url || "img/logo_fallback.png";
-  logo.alt = `${competitor.company_name || "Competitor"} logo`;
-  logo.className =
-    "h-12 w-12 rounded-xl border border-slate-200 bg-white object-contain";
-  logo.onerror = () => {
-    logo.onerror = null;
-    logo.src = "img/logo_fallback.png";
-  };
+  header.className = "mb-5";
 
   const info = document.createElement("div");
   const title = document.createElement("h3");
@@ -292,7 +288,7 @@ const createCompetitorCard = (competitor) => {
   category.textContent = competitor.category || "Market competitor";
 
   info.append(title, category);
-  header.append(logo, info);
+  header.append(info);
 
   const grid = document.createElement("div");
   grid.className = "card-grid";
@@ -372,7 +368,12 @@ const handleSubmit = async (event) => {
   clearError();
   toggleClass(selectors.validationHint, "hidden", true);
 
-  const inputValue = sanitizeUrlInput(selectors.urlInput.value);
+  const normalizedInput = normalizeCompanyUrl(selectors.urlInput.value);
+  if (normalizedInput) {
+    selectors.urlInput.value = normalizedInput;
+  }
+
+  const inputValue = normalizedInput;
 
   if (!inputValue || !isValidUrl(inputValue)) {
     toggleClass(selectors.validationHint, "hidden", false);
