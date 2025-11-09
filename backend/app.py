@@ -3,6 +3,13 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .crew_agents import BattlecardCrew
+from .models import AnalyzeRequest
+from .services import analysis_service, layout_service, search_service
+
+app = FastAPI()
+
+# CORS settings
 origins = [
     "https://candicesxc.github.io",
     "https://candicesxc.github.io/competitive-battlecard-ai",
@@ -15,6 +22,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+@app.post("/analyze")
+async def analyze(request: AnalyzeRequest):
+    # this is just a sketch – keep whatever logic you already had
+    result = await analysis_service.run_analysis(request.company_url)
+    return result
+    
+
 
 import logging
 from typing import Any, Dict
