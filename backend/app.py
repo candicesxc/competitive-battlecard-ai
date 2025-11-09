@@ -10,7 +10,7 @@ from pydantic import BaseModel, HttpUrl
 
 from .crew_agents import BattlecardCrew
 from .services.analysis_service import AnalysisError
-from .services.search_service import SerperError
+from .services.search_service import SearchProviderError
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -39,8 +39,8 @@ async def analyze_company(payload: AnalyzeRequest) -> JSONResponse:
 
     try:
         result = await battlecard_crew.run(str(payload.company_url))
-    except SerperError as exc:
-        logger.error("Serper error: %s", exc)
+    except SearchProviderError as exc:
+        logger.error("Search provider error: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except AnalysisError as exc:
         logger.error("Analysis error: %s", exc)
