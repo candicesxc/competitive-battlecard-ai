@@ -3,7 +3,7 @@
 **Competitive Battlecard AI** is a web-based intelligence tool built for **product marketers** and **go-to-market teams**.  
 It automatically analyzes a company URL, finds its key competitors, and generates structured **battlecards** — complete with strengths, weaknesses, pricing, positioning, and visual summaries.  
 
-This project combines **FastAPI + CrewAI + OpenAI + Serper API** for analysis, and a sleek **Tailwind CSS + JavaScript frontend** for interactive visualization.
+This project combines **FastAPI + CrewAI + OpenAI + SerpAPI** for analysis, and a sleek **Tailwind CSS + JavaScript frontend** for interactive visualization.
 
 ---
 
@@ -47,7 +47,7 @@ backend/
 ├── models/
 └── utils/
 
-.env.example # API keys for OpenAI and Serper
+.env.example # API keys for OpenAI and SerpAPI
 requirements.txt # Python dependencies
 
 yaml
@@ -62,6 +62,6 @@ Copy code
 | **Frontend** | HTML, JavaScript, Tailwind CSS |
 | **Backend** | FastAPI, Uvicorn |
 | **AI & Agents** | CrewAI, OpenAI API |
-| **Search** | Serper API |
+| **Search** | SerpAPI |
 | **Deployment** | Render (backend) + GitHub Pages (frontend) |
 
