@@ -101,6 +101,14 @@ class BattlecardCrew:
         overview = search_service.parse_company_overview(profile)
         news_payload = await search_service.search_company_news(name)
 
+        knowledge_graph = (
+            profile.get("knowledgeGraph")
+            or profile.get("knowledge_graph", {})
+        )
+        organic_results = (
+            profile.get("organic") or profile.get("organic_results", [])
+        )
+
         news_items = [
             {
                 "title": item.get("title"),
@@ -121,8 +129,8 @@ class BattlecardCrew:
             company_name=overview.get("name") or name,
             website=overview.get("website") or url,
             overview=overview.get("description"),
-            category=profile.get("knowledgeGraph", {}).get("type"),
-            snippet=profile.get("organic", [{}])[0].get("snippet") if profile.get("organic") else None,
+            category=knowledge_graph.get("type"),
+            snippet=organic_results[0].get("snippet") if organic_results else None,
             news=news_items,
             raw_context=combined_context,
         )
