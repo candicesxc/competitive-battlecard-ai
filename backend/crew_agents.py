@@ -7,9 +7,12 @@ from typing import Any, Dict, List, Optional
 
 from crewai import Agent
 
+from .models.company_profile import CompanyProfile
 from .services import (
     analysis_service,
+    competitor_discovery,
     competitor_pipeline,
+    competitor_scoring,
     layout_service,
     search_service,
 )
@@ -94,6 +97,7 @@ class BattlecardCrew:
         competitive_score_10 = 1
 
         try:
+            # Build target company profile
             if target_page_text:
                 target_profile = await competitor_pipeline.build_company_profile(
                     target_page_text,
@@ -103,19 +107,70 @@ class BattlecardCrew:
                 logger.warning("No homepage content available for %s", website)
 
             if target_profile:
-                candidates = await competitor_pipeline.fetch_candidate_companies(
-                    target_profile
+                # Convert to CompanyProfile format
+                company_profile: CompanyProfile = {
+                    "name": target_profile.get("name", ""),
+                    "website": website,
+                    "industry": target_profile.get("industry", ""),
+                    "sub_industry": target_profile.get("sub_industry", ""),
+                    "product_summary": target_profile.get("summary", ""),
+                    "target_audience": target_profile.get("target_audience", ""),
+                    "primary_use_cases": target_profile.get("core_products", []),
+                    "company_size": target_profile.get("company_size", "unknown"),
+                    "business_model": target_profile.get("business_model", "unknown"),
+                    "core_products": target_profile.get("core_products", []),
+                    "summary": target_profile.get("summary", ""),
+                    "keywords": target_profile.get("keywords", []),
+                    "geography_focus": target_profile.get("geography_focus", ""),
+                    "pricing_tier": target_profile.get("pricing_tier", "unknown"),
+                }
+
+                # Discover competitors via new Gemini-style flow
+                competitor_stubs = await competitor_discovery.discover_competitors_via_search(
+                    company_profile
                 )
-                enriched_candidates = await competitor_pipeline.enrich_candidate_profiles(
-                    candidates
+
+                # Score competitors
+                scored_competitors = await competitor_scoring.score_competitors(
+                    target_profile=company_profile,
+                    target_url=website,
+                    competitors=competitor_stubs,
                 )
-                (
-                    ranked_competitors,
-                    competitive_score_10,
-                ) = await competitor_pipeline.score_and_label_competitors(
-                    target_profile,
-                    enriched_candidates,
+
+                # Filter and sort
+                scored_competitors = [
+                    c for c in scored_competitors
+                    if c.get("competitor_type") != "irrelevant"
+                ]
+                scored_competitors.sort(
+                    key=lambda c: c.get("similarity_score", 0.0), reverse=True
                 )
+
+                # Convert to expected format
+                ranked_competitors = []
+                for scored in scored_competitors[:5]:
+                    ranked_competitors.append({
+                        "name": scored.get("name", ""),
+                        "website": scored.get("website", ""),
+                        "similarity_score": scored.get("similarity_score", 0.0),
+                        "industry_similarity": scored.get("industry_similarity", 0.0),
+                        "product_similarity": scored.get("product_similarity", 0.0),
+                        "audience_similarity": scored.get("audience_similarity", 0.0),
+                        "size_similarity": scored.get("size_similarity", 0.0),
+                        "business_model_similarity": scored.get("business_model_similarity", 0.0),
+                        "competitor_type": scored.get("competitor_type", "adjacent"),
+                        "reason_for_similarity": scored.get("reason_for_similarity", ""),
+                        "competitive_score": max(
+                            1, min(10, round(scored.get("similarity_score", 0.0) / 10.0))
+                        ),
+                    })
+
+                if ranked_competitors:
+                    best_similarity = max(
+                        (c.get("similarity_score", 0) or 0 for c in ranked_competitors),
+                        default=0,
+                    )
+                    competitive_score_10 = max(1, min(10, round(best_similarity / 10.0)))
         except analysis_service.AnalysisError as exc:
             logger.warning("Target profiling failed: %s", exc)
         except Exception as exc:  # noqa: BLE001 - log unexpected pipeline issues
@@ -140,7 +195,7 @@ class BattlecardCrew:
             target_profile.setdefault("summary", overview.get("description") or target_profile.get("summary", ""))
 
         if not ranked_competitors:
-            logger.warning("Falling back to basic SERP competitor discovery")
+            logger.warning("Falling back to basic Exa competitor discovery")
             try:
                 competitors_raw = await search_service.search_company_competitors(
                     overview["name"]

@@ -3,7 +3,7 @@
 **Competitive Battlecard AI** is a web-based intelligence tool built for **product marketers** and **go-to-market teams**.  
 It automatically analyzes a company URL, finds its key competitors, and generates structured **battlecards** — complete with strengths, weaknesses, pricing, positioning, and visual summaries.  
 
-This project combines **FastAPI + CrewAI + OpenAI + SerpAPI** for analysis, and a sleek **Tailwind CSS + JavaScript frontend** for interactive visualization.
+This project combines **FastAPI + CrewAI + OpenAI + Exa** for analysis, and a sleek **Tailwind CSS + JavaScript frontend** for interactive visualization.
 
 ---
 
@@ -24,7 +24,7 @@ This project combines **FastAPI + CrewAI + OpenAI + SerpAPI** for analysis, and 
   - Strengths / Weaknesses
   - “How We Win” & “Potential Landmines”
 - 📊 **Market Insights Summary** — Summarized view of the target company’s position in the landscape.
-- 🖼️ **Visual Logos & Scoring Bars** — Each card displays company logos and a competitive score.
+- 🖼️ **Visual Logos & Company Info** — Each card displays company information and website URLs.
 - 💬 **CrewAI Integration** — Coordinates multiple agents (research, analysis, summarization).
 - 🌈 **Vibe-Coded Frontend** — Modern UI styled with Tailwind and subtle animations.
 
@@ -42,12 +42,14 @@ backend/
 ├── crew_agents.py # CrewAI agent orchestration
 ├── services/
 │ ├── analysis_service.py
+│ ├── competitor_discovery.py # Gemini-style competitor discovery via Exa
+│ ├── competitor_scoring.py # Competitor similarity scoring
 │ ├── layout_service.py
 │ └── search_service.py
 ├── models/
 └── utils/
 
-.env.example # API keys for OpenAI and SerpAPI
+.env.example # API keys for OpenAI and Exa
 requirements.txt # Python dependencies
 
 yaml
@@ -62,6 +64,6 @@ Copy code
 | **Frontend** | HTML, JavaScript, Tailwind CSS |
 | **Backend** | FastAPI, Uvicorn |
 | **AI & Agents** | CrewAI, OpenAI API |
-| **Search** | SerpAPI |
+| **Search** | Exa (for competitor discovery and web search) |
 | **Deployment** | Render (backend) + GitHub Pages (frontend) |
 
