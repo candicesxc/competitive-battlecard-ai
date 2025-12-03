@@ -171,111 +171,8 @@ _CANDIDATE_PROFILE_SCHEMA: Dict[str, Any] = {
     },
 }
 
-COMPETITOR_RANKING_PROMPT = """
-You are a senior competitive intelligence analyst.
-
-You will receive:
-1) A JSON object describing a target company (target_profile).
-2) A JSON array of candidate companies, where each has:
-   - name
-   - website
-   - profile with: industry, company_size, business_model, target_audience, core_products, summary.
-
-Your job is to compare each candidate to the target and evaluate:
-
-1. industry_similarity (0 to 100):
-   - 100 if same specific industry and sub-industry.
-   - Lower if only loosely related.
-
-2. product_similarity (0 to 100):
-   - 100 if they sell very similar core products or solve the same problem.
-   - Lower if products are different.
-
-3. audience_similarity (0 to 100):
-   - 100 if they target the same customer segment.
-   - Lower if audience is different.
-
-4. size_similarity (0 to 100):
-   - 100 if similar company size (for example both midmarket or both enterprise).
-   - Lower if very different in scale.
-
-5. business_model_similarity (0 to 100):
-   - 100 if they use the same business model (for example both B2B SaaS).
-   - Lower otherwise.
-
-Then compute an overall similarity_score (0 to 100) that reflects how directly this company competes with the target.
-
-Also assign competitor_type:
-- "direct" if product, industry, and audience are strongly similar.
-- "adjacent" if they operate nearby in the market or serve a similar audience with a different product.
-- "aspirational" if much larger but in essentially the same space.
-- "irrelevant" if they are not a meaningful competitor.
-
-For each candidate, return:
-
-{
-  "name": "...",
-  "website": "...",
-  "industry_similarity": <0-100>,
-  "product_similarity": <0-100>,
-  "audience_similarity": <0-100>,
-  "size_similarity": <0-100>,
-  "business_model_similarity": <0-100>,
-  "similarity_score": <0-100>,
-  "competitor_type": "direct" | "adjacent" | "aspirational" | "irrelevant",
-  "reason_for_similarity": "1 to 3 sentences explaining why this company is or is not a strong competitor."
-}
-
-Rules:
-- Only mark a company as "direct" if the product and target audience are clearly similar.
-- Prefer companies that sell similar products, to similar customers, in the same industry and size band.
-- If in doubt, lower the similarity_score instead of inflating it.
-
-Return a single JSON array only, with no extra text or markdown.
-"""
-
-_SCORING_SCHEMA: Dict[str, Any] = {
-    "name": "competitor_similarity_scores",
-    "schema": {
-        "type": "array",
-        "items": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"},
-                "website": {"type": "string"},
-                "similarity_score": {"type": "number"},
-                "industry_similarity": {"type": "number"},
-                "product_similarity": {"type": "number"},
-                "audience_similarity": {"type": "number"},
-                "size_similarity": {"type": "number"},
-                "business_model_similarity": {"type": "number"},
-                "competitor_type": {
-                    "type": "string",
-                    "enum": [
-                        "direct",
-                        "adjacent",
-                        "aspirational",
-                        "irrelevant",
-                    ],
-                },
-                "reason_for_similarity": {"type": "string"},
-            },
-            "required": [
-                "name",
-                "website",
-                "similarity_score",
-                "industry_similarity",
-                "product_similarity",
-                "audience_similarity",
-                "size_similarity",
-                "business_model_similarity",
-                "competitor_type",
-                "reason_for_similarity",
-            ],
-            "additionalProperties": False,
-        },
-    },
-}
+# _SCORING_SCHEMA has been removed. Scoring now uses Python types from models.company_profile.
+# See services/competitor_scoring.py for the new scoring implementation.
 
 _SKIP_DOMAIN_KEYWORDS = (
     "g2.com",
@@ -776,7 +673,7 @@ async def score_and_label_competitors(
         result = await _json_completion(
             messages,
             model=settings.strategist_model,
-            response_format={"type": "json_schema", "json_schema": _SCORING_SCHEMA},
+            response_format={"type": "json_object"},
         )
     except AnalysisError as exc:
         logger.warning("Competitor scoring failed: %s", exc)

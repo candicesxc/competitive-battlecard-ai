@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import List, Optional, TypedDict
+from typing import List, Literal, Optional, TypedDict
+
+CompetitorType = Literal["direct", "adjacent", "aspirational", "irrelevant"]
 
 
 class CompanyProfile(TypedDict, total=False):
@@ -22,4 +24,28 @@ class CompanyProfile(TypedDict, total=False):
     pricing_tier: str
 
 
-__all__ = ["CompanyProfile"]
+class CompetitorStub(TypedDict, total=False):
+    """A competitor candidate discovered from web search snippets."""
+
+    name: str
+    website: str
+    description: str
+    evidence_strength: Literal["high", "medium", "low"]
+
+
+class ScoredCompetitor(TypedDict, total=False):
+    """A competitor with similarity scores and classification."""
+
+    name: str
+    website: str
+    industry_similarity: float
+    product_similarity: float
+    audience_similarity: float
+    size_similarity: float
+    business_model_similarity: float
+    similarity_score: float
+    competitor_type: CompetitorType
+    reason_for_similarity: str
+
+
+__all__ = ["CompanyProfile", "CompetitorStub", "ScoredCompetitor", "CompetitorType"]

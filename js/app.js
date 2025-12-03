@@ -266,34 +266,7 @@ const createSection = (title, items, accentClass) => {
   return section;
 };
 
-const createScoreBar = (score) => {
-  const clamped = Math.max(0, Math.min(Number(score) || 0, 10));
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "mt-4";
-
-  const labelRow = document.createElement("div");
-  labelRow.className =
-    "flex items-center justify-between text-xs font-medium text-slate-500";
-
-  const label = document.createElement("span");
-  label.textContent = "Competitive score";
-  const value = document.createElement("span");
-  value.className = "text-slate-700";
-  value.textContent = `${clamped}/10`;
-
-  labelRow.append(label, value);
-
-  const bar = document.createElement("div");
-  bar.className = "mt-1 h-2 rounded-full bg-slate-200";
-  const fill = document.createElement("div");
-  fill.className = "h-2 rounded-full bg-indigo-500 transition-all";
-  fill.style.width = `${clamped * 10}%`;
-  bar.appendChild(fill);
-
-  wrapper.append(labelRow, bar);
-  return wrapper;
-};
+// createScoreBar function removed - competitive score no longer displayed in UI
 
 const createTargetCard = (target, marketSummary) => {
   const section = document.createElement("section");
@@ -366,8 +339,21 @@ const createCompetitorCard = (competitor) => {
   const title = document.createElement("h3");
   title.className = "text-lg font-semibold text-slate-900";
   title.textContent = competitor.company_name || "Competitor";
+  
+  // Add website URL directly under the competitor name
+  const website = competitor.website || "";
+  if (website) {
+    const websiteLink = document.createElement("a");
+    websiteLink.href = website;
+    websiteLink.target = "_blank";
+    websiteLink.rel = "noopener noreferrer";
+    websiteLink.className = "text-sm text-slate-500 hover:text-indigo-600 mt-1 block break-all";
+    websiteLink.textContent = website;
+    info.appendChild(websiteLink);
+  }
+  
   const category = document.createElement("p");
-  category.className = "text-xs uppercase tracking-wide text-slate-500";
+  category.className = "text-xs uppercase tracking-wide text-slate-500 mt-1";
   category.textContent = competitor.category || "Market competitor";
 
   info.append(title, category);
@@ -389,7 +375,7 @@ const createCompetitorCard = (competitor) => {
     ),
   );
 
-  article.append(header, grid, createScoreBar(competitor.score_vs_target));
+  article.append(header, grid);
   return article;
 };
 
