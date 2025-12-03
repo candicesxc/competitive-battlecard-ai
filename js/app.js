@@ -93,9 +93,10 @@ const selectors = {
   errorText: document.getElementById("error-text"),
   loadingState: document.getElementById("loading-state"),
   progressFill: document.getElementById("progress-fill"),
-  progressValue: document.getElementById("progress-value"),
   progressMessage: document.getElementById("progress-message"),
   results: document.getElementById("results"),
+  domainSuggestion: document.getElementById("domain-suggestion"),
+  suggestionButton: document.getElementById("suggestion-button"),
 };
 
 const isValidUrl = (value) => {
@@ -140,9 +141,6 @@ const getProgressMessage = (value, elapsedSeconds) => {
 const updateProgressUI = () => {
   if (selectors.progressFill) {
     selectors.progressFill.style.width = `${progress}%`;
-  }
-  if (selectors.progressValue) {
-    selectors.progressValue.textContent = `${Math.round(progress)}%`;
   }
   if (selectors.progressMessage) {
     const elapsed = startTime ? (Date.now() - startTime) / 1000 : 0;
@@ -248,21 +246,52 @@ const normalizeCompanyUrl = (value) => {
   }
 
   let normalized = trimmed;
+  // Add https:// if protocol is missing
   if (!/^https?:\/\//i.test(normalized)) {
     normalized = `https://${normalized}`;
   }
 
   try {
     const url = new URL(normalized);
-    const isSimpleDomain = url.hostname.split(".").length === 2;
-    if (!/^www\./i.test(url.hostname) && isSimpleDomain) {
+    // For domains without www, add www if it's a simple domain (e.g., example.com)
+    const hostnameParts = url.hostname.split(".");
+    const isSimpleDomain = hostnameParts.length === 2;
+    const hasWww = /^www\./i.test(url.hostname);
+    
+    if (!hasWww && isSimpleDomain) {
       url.hostname = `www.${url.hostname}`;
     }
     return url.toString();
   } catch (error) {
     console.warn("Unable to normalize URL", error);
+    // If URL parsing fails, try to fix common issues
+    // Remove trailing slashes and spaces
+    normalized = normalized.replace(/\/+$/, "").trim();
     return normalized;
   }
+};
+
+// Common TLDs for domain completion suggestions
+const COMMON_TLDS = [".com", ".org", ".net", ".io", ".co", ".ai", ".dev"];
+
+const suggestDomainCompletion = (value) => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  // Check if the input looks like it's missing a TLD
+  // Pattern: https://www.domainname. (ends with a dot but no TLD)
+  const endsWithDotPattern = /^https?:\/\/[^\/]+\.$/i;
+  if (endsWithDotPattern.test(trimmed)) {
+    return ".com"; // Default suggestion
+  }
+
+  // Pattern: https://www.domainname (no dot, no TLD)
+  const noTldPattern = /^https?:\/\/(www\.)?[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/i;
+  if (noTldPattern.test(trimmed)) {
+    return ".com"; // Default suggestion
+  }
+
+  return null;
 };
 
 const createSection = (title, items, accentClass) => {
@@ -294,6 +323,43 @@ const createSection = (title, items, accentClass) => {
   });
 
   section.appendChild(list);
+  return section;
+};
+
+const createPricingSection = (title, items, accentClass) => {
+  const section = document.createElement("div");
+  section.className =
+    "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md transition-all duration-200 hover:shadow-lg col-span-full";
+
+  const heading = document.createElement("h3");
+  heading.className = `section-title mb-3 ${accentClass}`;
+  heading.textContent = title;
+  section.appendChild(heading);
+
+  if (!items || items.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "text-sm text-slate-400 italic";
+    empty.textContent = "No data available.";
+    section.appendChild(empty);
+    return section;
+  }
+
+  // Create a column layout for pricing (2 columns)
+  const columnsContainer = document.createElement("div");
+  columnsContainer.className = "grid grid-cols-1 md:grid-cols-2 gap-4";
+
+  const list = document.createElement("ul");
+  list.className = "space-y-2.5 text-sm leading-relaxed text-slate-700 list-none";
+
+  items.forEach((item) => {
+    const li = document.createElement("li");
+    li.className = "flex items-start gap-2.5 before:content-['•'] before:text-indigo-500 before:font-bold before:flex-shrink-0 before:mt-0.5";
+    li.textContent = item;
+    list.appendChild(li);
+  });
+
+  columnsContainer.appendChild(list);
+  section.appendChild(columnsContainer);
   return section;
 };
 
@@ -358,10 +424,14 @@ const createTargetCard = (target, marketSummary) => {
   return section;
 };
 
-const createCompetitorCard = (competitor) => {
+const createCompetitorCard = (competitor, index, isActive = false) => {
   const article = document.createElement("article");
   article.className =
-    "group rounded-3xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-8 lg:p-10 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-slate-300/80";
+    `competitor-card group rounded-3xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-8 lg:p-10 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-slate-300/80`;
+  article.dataset.competitorIndex = index;
+  if (!isActive) {
+    article.classList.add("hidden");
+  }
 
   const header = document.createElement("header");
   header.className = "mb-6 pb-6 border-b border-slate-200/60";
@@ -399,7 +469,6 @@ const createCompetitorCard = (competitor) => {
   grid.append(
     createSection("Company overview", [competitor.overview].filter(Boolean), "text-blue-600"),
     createSection("Products", competitor.products, "text-blue-600"),
-    createSection("Pricing", competitor.pricing, "text-blue-600"),
     createSection("Strengths", competitor.strengths, "text-emerald-600"),
     createSection("Weaknesses", competitor.weaknesses, "text-slate-500"),
     createSection("Key Differentiators", competitor.how_we_win, "text-red-500"),
@@ -409,6 +478,10 @@ const createCompetitorCard = (competitor) => {
       "text-purple-500",
     ),
   );
+
+  // Add pricing section at the end with full width (2 columns)
+  const pricingSection = createPricingSection("Pricing", competitor.pricing, "text-blue-600");
+  grid.appendChild(pricingSection);
 
   article.append(header, grid);
   return article;
@@ -442,10 +515,61 @@ const createCompetitorGrid = (competitors) => {
     return section;
   }
 
+  // Create tabs container
+  const tabsContainer = document.createElement("div");
+  tabsContainer.className = "competitor-tabs-container mb-6";
+  
+  const tabsList = document.createElement("div");
+  tabsList.className = "flex flex-wrap gap-2 justify-center border-b border-slate-200 pb-4";
+  
+  competitors.forEach((competitor, index) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = `competitor-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+      index === 0 
+        ? "bg-indigo-600 text-white shadow-md" 
+        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+    }`;
+    tab.textContent = competitor.company_name || `Competitor ${index + 1}`;
+    tab.dataset.competitorIndex = index;
+    tab.setAttribute("aria-selected", index === 0 ? "true" : "false");
+    tab.setAttribute("role", "tab");
+    
+    tab.addEventListener("click", () => {
+      // Update tab states
+      tabsList.querySelectorAll(".competitor-tab").forEach((t, i) => {
+        if (i === index) {
+          t.classList.remove("bg-slate-100", "text-slate-700");
+          t.classList.add("bg-indigo-600", "text-white", "shadow-md");
+          t.setAttribute("aria-selected", "true");
+        } else {
+          t.classList.remove("bg-indigo-600", "text-white", "shadow-md");
+          t.classList.add("bg-slate-100", "text-slate-700");
+          t.setAttribute("aria-selected", "false");
+        }
+      });
+      
+      // Show/hide competitor cards
+      section.querySelectorAll(".competitor-card").forEach((card, i) => {
+        if (i === index) {
+          card.classList.remove("hidden");
+        } else {
+          card.classList.add("hidden");
+        }
+      });
+    });
+    
+    tabsList.appendChild(tab);
+  });
+  
+  tabsContainer.appendChild(tabsList);
+  section.appendChild(tabsContainer);
+
+  // Create competitor cards grid
   const grid = document.createElement("div");
   grid.className = "grid grid-cols-1 gap-8";
-  competitors.forEach((competitor) => {
-    grid.appendChild(createCompetitorCard(competitor));
+  competitors.forEach((competitor, index) => {
+    grid.appendChild(createCompetitorCard(competitor, index, index === 0));
   });
 
   section.appendChild(grid);
@@ -535,6 +659,51 @@ const handleSubmit = async (event) => {
     setLoading(false);
   }
 };
+
+// Handle URL input with auto-correction and domain suggestions
+if (selectors.urlInput) {
+  let suggestionTimeout = null;
+  
+  selectors.urlInput.addEventListener("input", (e) => {
+    const value = e.target.value;
+    
+    // Clear any existing timeout
+    if (suggestionTimeout) {
+      clearTimeout(suggestionTimeout);
+    }
+    
+    // Hide suggestion when input is empty
+    if (!value.trim()) {
+      toggleClass(selectors.domainSuggestion, "hidden", true);
+      return;
+    }
+    
+    // Check for domain completion suggestion after a short delay
+    suggestionTimeout = setTimeout(() => {
+      const suggestion = suggestDomainCompletion(value);
+      if (suggestion && selectors.domainSuggestion && selectors.suggestionButton) {
+        const suggestedUrl = value.endsWith(".") 
+          ? `${value}com` 
+          : `${value}${suggestion}`;
+        selectors.suggestionButton.textContent = suggestedUrl;
+        selectors.suggestionButton.onclick = () => {
+          selectors.urlInput.value = suggestedUrl;
+          toggleClass(selectors.domainSuggestion, "hidden", true);
+        };
+        toggleClass(selectors.domainSuggestion, "hidden", false);
+      } else {
+        toggleClass(selectors.domainSuggestion, "hidden", true);
+      }
+    }, 500);
+  });
+  
+  // Hide suggestion on blur (after a short delay to allow clicking the suggestion)
+  selectors.urlInput.addEventListener("blur", () => {
+    setTimeout(() => {
+      toggleClass(selectors.domainSuggestion, "hidden", true);
+    }, 200);
+  });
+}
 
 if (selectors.form) {
   selectors.form.addEventListener("submit", handleSubmit);
