@@ -4,17 +4,9 @@ import logging
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-import httpx
-
-from ..config import get_settings
+from .exa_client import exa
 
 logger = logging.getLogger(__name__)
-
-SERPAPI_ENDPOINT = "https://serpapi.com/search"
-SERPAPI_ENGINES = {
-    "search": "google",
-    "news": "google_news",
-}
 
 
 class SearchProviderError(RuntimeError):
@@ -31,84 +23,63 @@ def extract_domain(url: str) -> Optional[str]:
     return None
 
 
-async def _serpapi_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Perform a GET request to the SerpAPI service and return the JSON body."""
+async def _exa_search_request(query: str, num_results: int = 10) -> Dict[str, Any]:
+    """Perform an Exa search and return results in the expected format."""
 
-    settings = get_settings()
-    if not settings.serpapi_api_key:
-        raise SearchProviderError("SerpAPI key is not configured.")
+    try:
+        results = await exa.search_and_contents(
+            query,
+            num_results=num_results,
+            text={"max_characters": 500},
+        )
 
-    engine = SERPAPI_ENGINES.get(kind)
-    if not engine:
-        raise SearchProviderError(f"Unsupported SerpAPI request type: {kind}")
-
-    params = {
-        "api_key": settings.serpapi_api_key.get_secret_value(),
-        "engine": engine,
-        **payload,
-    }
-
-    async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
-        try:
-            response = await client.get(SERPAPI_ENDPOINT, params=params)
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            body = exc.response.text
-            logger.error(
-                "SerpAPI returned error %s: %s", exc.response.status_code, body
-            )
-            raise SearchProviderError(
-                f"Search provider 'serpapi' returned error {exc.response.status_code}"
-            ) from exc
-        except httpx.HTTPError as exc:
-            logger.exception("SerpAPI request failed")
-            raise SearchProviderError("Search provider 'serpapi' request failed") from exc
-
-    return response.json()
-
-
-def _normalize_search_results(kind: str, response: Dict[str, Any]) -> Dict[str, Any]:
-    """Normalize SerpAPI payload differences."""
-
-    normalized: Dict[str, Any] = dict(response)
-
-    organic_results = response.get("organic_results")
-    if organic_results is not None and "organic" not in normalized:
-        normalized["organic"] = organic_results
-
-    knowledge_graph = response.get("knowledge_graph")
-    if knowledge_graph is not None:
-        normalized_kg = dict(knowledge_graph)
-        if (
-            "people_also_search_for" in knowledge_graph
-            and "peopleAlsoSearchFor" not in normalized_kg
-        ):
-            normalized_kg["peopleAlsoSearchFor"] = knowledge_graph[
-                "people_also_search_for"
-            ]
-        normalized.setdefault("knowledgeGraph", normalized_kg)
-
-    if kind == "news":
-        news_items = response.get("news_results")
-        if news_items is not None:
-            normalized["news"] = [
+        # Convert Exa results to the expected format
+        organic_results = []
+        for result in results.results:
+            organic_results.append(
                 {
-                    "title": item.get("title"),
-                    "link": item.get("link"),
-                    "snippet": item.get("snippet") or item.get("summary"),
-                    "date": item.get("date"),
+                    "title": result.title or "",
+                    "link": result.url or "",
+                    "snippet": result.text[:300] if result.text else "",
                 }
-                for item in news_items
-            ]
+            )
 
-    return normalized
+        return {
+            "organic": organic_results,
+            "organic_results": organic_results,
+            "knowledgeGraph": {},
+            "knowledge_graph": {},
+        }
+    except Exception as exc:
+        logger.error("Exa search failed: %s", exc)
+        raise SearchProviderError("Search provider request failed") from exc
 
 
 async def _search_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Route search requests to SerpAPI and normalize the result."""
+    """Route search requests to Exa and normalize the result."""
 
-    response = await _serpapi_request(kind, payload)
-    return _normalize_search_results(kind, response)
+    query = payload.get("q", "")
+    num = payload.get("num", 10)
+
+    if kind == "news":
+        # Exa doesn't have a dedicated news endpoint, so we'll search with "news" in the query
+        query = f"{query} news"
+        results = await _exa_search_request(query, num_results=num)
+        # Convert organic results to news format
+        news_items = [
+            {
+                "title": item.get("title", ""),
+                "link": item.get("link", ""),
+                "snippet": item.get("snippet", ""),
+                "date": None,
+            }
+            for item in results.get("organic", [])
+        ]
+        results["news"] = news_items
+        results["news_results"] = news_items
+        return results
+
+    return await _exa_search_request(query, num_results=num)
 
 
 async def search_company_profile(target_url: str) -> Dict[str, Any]:
@@ -121,7 +92,7 @@ async def search_company_profile(target_url: str) -> Dict[str, Any]:
 
 
 async def generic_company_search(query: str, *, num: int = 10) -> Dict[str, Any]:
-    """Run a generic search query using the configured provider."""
+    """Run a generic search query using Exa."""
 
     payload = {"q": query, "num": num}
     return await _search_request("search", payload)

@@ -4,13 +4,20 @@ import asyncio
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from collections import Counter
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import httpx
 
 from ..config import get_settings
+from ..models.company_profile import CompanyProfile
 from .analysis_service import AnalysisError, _json_completion
-from .search_service import extract_domain, generic_company_search
+from .cache import get_cached_result, set_cached_result
+from .exa_competitor_search import (
+    CompetitorCandidate,
+    find_competitor_candidates_with_exa,
+)
+from .search_service import extract_domain
 
 logger = logging.getLogger(__name__)
 
@@ -382,6 +389,58 @@ async def build_company_profile(page_text: str, url: str) -> Dict[str, Any]:
     return _build_fallback_profile(page_text, url)
 
 
+async def build_company_profile_from_url(url: str) -> CompanyProfile:
+    """Build a structured company profile from a URL, with caching."""
+
+    cache_key = f"profile:{extract_domain(url) or url}"
+    cached = get_cached_result(cache_key, max_age_seconds=3600)
+    if cached:
+        return cached
+
+    page_text = await fetch_page_text(url)
+    if not page_text:
+        # Fallback to minimal profile
+        fallback = _build_fallback_profile("", url)
+        result: CompanyProfile = {
+            "name": fallback.get("name", ""),
+            "website": url,
+            "industry": fallback.get("industry", ""),
+            "sub_industry": fallback.get("sub_industry", ""),
+            "product_summary": fallback.get("summary", ""),
+            "target_audience": fallback.get("target_audience", ""),
+            "primary_use_cases": [],
+            "company_size": fallback.get("company_size", "unknown"),
+            "business_model": fallback.get("business_model", "unknown"),
+            "core_products": fallback.get("core_products", []),
+            "summary": fallback.get("summary", ""),
+            "keywords": fallback.get("keywords", []),
+            "geography_focus": fallback.get("geography_focus", ""),
+            "pricing_tier": fallback.get("pricing_tier", "unknown"),
+        }
+        set_cached_result(cache_key, result)
+        return result
+
+    profile_dict = await build_company_profile(page_text, url)
+    result = {
+        "name": profile_dict.get("name", ""),
+        "website": url,
+        "industry": profile_dict.get("industry", ""),
+        "sub_industry": profile_dict.get("sub_industry", ""),
+        "product_summary": profile_dict.get("summary", ""),
+        "target_audience": profile_dict.get("target_audience", ""),
+        "primary_use_cases": profile_dict.get("core_products", []),
+        "company_size": profile_dict.get("company_size", "unknown"),
+        "business_model": profile_dict.get("business_model", "unknown"),
+        "core_products": profile_dict.get("core_products", []),
+        "summary": profile_dict.get("summary", ""),
+        "keywords": profile_dict.get("keywords", []),
+        "geography_focus": profile_dict.get("geography_focus", ""),
+        "pricing_tier": profile_dict.get("pricing_tier", "unknown"),
+    }
+    set_cached_result(cache_key, result)
+    return result
+
+
 def _should_skip_domain(domain: str, target_domain: Optional[str]) -> bool:
     if not domain:
         return True
@@ -403,71 +462,60 @@ def _clean_result_title(title: Optional[str]) -> str:
 
 
 async def fetch_candidate_companies(profile: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Search the web for potential competitors given a target profile."""
+    """Search for potential competitors using Exa, given a target profile."""
 
-    name = profile.get("name") or ""
-    industry = profile.get("industry") or ""
-    sub_industry = profile.get("sub_industry") or ""
-    business_model = profile.get("business_model") or ""
-    target_audience = profile.get("target_audience") or ""
-    core_products = profile.get("core_products") or []
-
-    queries_set = {
-        f"{industry} {sub_industry} software competitors".strip(),
-        f"{name} alternatives".strip(),
-    }
-
-    if core_products:
-        queries_set.add(f"{core_products[0]} competitors")
-    if business_model and target_audience:
-        queries_set.add(f"{business_model} vendors for {target_audience}")
-
-    queries = [q for q in queries_set if q]
-    if not queries:
+    target_url = profile.get("website", "")
+    if not target_url:
+        logger.warning("No target URL provided for competitor search")
         return []
 
-    search_tasks = [generic_company_search(query, num=10) for query in queries]
+    # Convert dict profile to CompanyProfile format
+    company_profile: CompanyProfile = {
+        "name": profile.get("name", ""),
+        "website": target_url,
+        "industry": profile.get("industry", ""),
+        "sub_industry": profile.get("sub_industry", ""),
+        "product_summary": profile.get("summary", ""),
+        "target_audience": profile.get("target_audience", ""),
+        "primary_use_cases": profile.get("core_products", []),
+        "company_size": profile.get("company_size", "unknown"),
+        "business_model": profile.get("business_model", "unknown"),
+        "core_products": profile.get("core_products", []),
+        "summary": profile.get("summary", ""),
+        "keywords": profile.get("keywords", []),
+        "geography_focus": profile.get("geography_focus", ""),
+        "pricing_tier": profile.get("pricing_tier", "unknown"),
+    }
+
+    # Check cache
+    cache_key = f"candidates:{extract_domain(target_url) or target_url}"
+    cached = get_cached_result(cache_key, max_age_seconds=3600)
+    if cached:
+        return cached
+
+    # Use Exa to find candidates
+    try:
+        exa_candidates = await find_competitor_candidates_with_exa(
+            target_url, company_profile, max_results=20
+        )
+    except Exception as exc:
+        logger.warning("Exa competitor search failed: %s", exc)
+        return []
+
+    # Convert CompetitorCandidate to the format expected by downstream code
     results: List[Dict[str, Any]] = []
-    target_domain = extract_domain(profile.get("website", ""))
-    seen_domains: set[str] = set()
-
-    for query, payload in zip(
-        queries,
-        await asyncio.gather(*search_tasks, return_exceptions=True),
-    ):
-        if isinstance(payload, Exception):
-            logger.warning("Search failed for '%s': %s", query, payload)
-            continue
-
-        organic = payload.get("organic") or payload.get("organic_results", [])
-        for item in organic:
-            url = item.get("link") or ""
-            domain = extract_domain(url or "") or ""
-            snippet = item.get("snippet") or item.get("rich_snippet", "") or ""
-            if (
-                not url
-                or domain in seen_domains
-                or _should_skip_domain(domain, target_domain)
-            ):
-                continue
-
-            seen_domains.add(domain)
-            readable_name = _clean_result_title(item.get("title"))
-            if not readable_name and domain:
-                readable_name = domain.split(".")[0].replace("-", " ").title()
-
-            result = {
-                "name": readable_name,
-                "website": url,
-                "snippet": snippet,
-                "source_url": url,
-                "query": query,
+    for candidate in exa_candidates:
+        results.append(
+            {
+                "name": candidate.get("name", ""),
+                "website": candidate.get("website", ""),
+                "snippet": candidate.get("snippet", ""),
+                "source_url": candidate.get("website", ""),
+                "raw_text": candidate.get("raw_text", ""),
             }
-            if result["name"] and result["website"]:
-                results.append(result)
-            if len(results) >= 20:
-                return results
+        )
 
+    set_cached_result(cache_key, results)
     return results
 
 
@@ -484,7 +532,8 @@ async def enrich_candidate_profiles(
         if not homepage:
             return None
 
-        page_text = await fetch_page_text(homepage)
+        # Use raw_text if available (from Exa), otherwise fetch
+        page_text = candidate.get("raw_text") or await fetch_page_text(homepage)
         if not page_text:
             return None
 
@@ -664,13 +713,21 @@ def _fallback_competitor_type(score_bundle: Dict[str, float]) -> str:
 def _prepare_ranking_payload(target_profile: Dict[str, Any], candidates: List[Dict[str, Any]]):
     simplified_candidates = []
     for candidate in candidates:
-        simplified_candidates.append(
-            {
-                "name": candidate.get("name"),
-                "website": candidate.get("website"),
-                "profile": candidate.get("profile", {}),
-            }
-        )
+        # Include text excerpt from raw_text if available (first 1500-2000 chars)
+        raw_text = candidate.get("raw_text", "")
+        text_excerpt = raw_text[:2000] if raw_text else ""
+        
+        candidate_data = {
+            "name": candidate.get("name"),
+            "website": candidate.get("website"),
+            "profile": candidate.get("profile", {}),
+        }
+        
+        # Add text excerpt if available to help with scoring
+        if text_excerpt:
+            candidate_data["text_excerpt"] = text_excerpt
+        
+        simplified_candidates.append(candidate_data)
     return {
         "instructions": COMPETITOR_RANKING_PROMPT,
         "target_profile": target_profile,
@@ -688,6 +745,22 @@ async def score_and_label_competitors(
 
     if not candidates:
         return [], 1
+
+    # Create cache key from target profile and candidate domains
+    target_url = target_profile.get("website", "")
+    candidate_domains = sorted(
+        [
+            extract_domain(c.get("website", "")) or ""
+            for c in candidates[:8]
+            if c.get("website")
+        ]
+    )
+    cache_key = f"scoring:{extract_domain(target_url) or target_url}:{':'.join(candidate_domains[:5])}"
+    
+    cached = get_cached_result(cache_key, max_age_seconds=3600)
+    if cached:
+        ranking, competitive_score_10 = cached
+        return ranking[:limit], competitive_score_10
 
     trimmed_candidates = candidates[:8]
     payload = _prepare_ranking_payload(target_profile, trimmed_candidates)
@@ -802,12 +875,16 @@ async def score_and_label_competitors(
     )
     competitive_score_10 = max(1, min(10, round(best_similarity / 10.0)))
 
+    # Cache the result
+    set_cached_result(cache_key, (ranking, competitive_score_10))
+
     return ranking, competitive_score_10
 
 
 __all__ = [
     "fetch_page_text",
     "build_company_profile",
+    "build_company_profile_from_url",
     "fetch_candidate_companies",
     "enrich_candidate_profiles",
     "score_and_label_competitors",
