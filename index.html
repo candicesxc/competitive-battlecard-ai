@@ -18,6 +18,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Alan+Sans:wght@300..900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="js/battlecardTypes.js"></script>
+    <script src="js/utils/battlecardPdf.js"></script>
     <script defer src="js/app.js"></script>
   </head>
   <body class="bg-slate-100 text-slate-900 antialiased">
@@ -72,6 +75,16 @@
           <p class="mt-3 flex items-center gap-2 text-xs text-slate-500">
             Works best with tech startups. Uses OpenAI and Exa for research &amp; analysis.
           </p>
+          
+          <!-- Saved battlecards section -->
+          <div id="saved-battlecards-container" class="mt-4 hidden">
+            <label class="block text-xs font-medium text-slate-600 mb-2">
+              Saved battlecards
+            </label>
+            <div id="saved-battlecards-list" class="flex flex-wrap gap-2">
+              <!-- Saved battlecard buttons will be inserted here -->
+            </div>
+          </div>
         </form>
       </section>
 
@@ -100,9 +113,24 @@
 
       <section id="results" class="mt-12 hidden fade-in">
         <div class="rounded-3xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-8 shadow-xl">
-          <p class="text-sm text-slate-500">
-            Your battlecard will appear here once the analysis completes.
-          </p>
+          <div id="results-content">
+            <p class="text-sm text-slate-500">
+              Your battlecard will appear here once the analysis completes.
+            </p>
+          </div>
+          <!-- Download PDF button -->
+          <div id="pdf-download-container" class="mt-6 hidden text-center">
+            <button
+              id="download-pdf-btn"
+              type="button"
+              class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-indigo-700 hover:shadow-lg hover:scale-[1.02]"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Download as PDF
+            </button>
+          </div>
         </div>
       </section>
 
