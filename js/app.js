@@ -238,26 +238,27 @@ const normalizeCompanyUrl = (value) => {
 const createSection = (title, items, accentClass) => {
   const section = document.createElement("div");
   section.className =
-    "rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm";
+    "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md transition-all duration-200 hover:shadow-lg";
 
   const heading = document.createElement("h3");
-  heading.className = `section-title mb-2 ${accentClass}`;
+  heading.className = `section-title mb-3 ${accentClass}`;
   heading.textContent = title;
   section.appendChild(heading);
 
   if (!items || items.length === 0) {
     const empty = document.createElement("p");
-    empty.className = "text-sm text-slate-400";
+    empty.className = "text-sm text-slate-400 italic";
     empty.textContent = "No data available.";
     section.appendChild(empty);
     return section;
   }
 
   const list = document.createElement("ul");
-  list.className = "space-y-1 text-sm text-slate-700 list-disc list-inside";
+  list.className = "space-y-2.5 text-sm leading-relaxed text-slate-700 list-none";
 
   items.forEach((item) => {
     const li = document.createElement("li");
+    li.className = "flex items-start gap-2.5 before:content-['•'] before:text-indigo-500 before:font-bold before:flex-shrink-0 before:mt-0.5";
     li.textContent = item;
     list.appendChild(li);
   });
@@ -271,17 +272,17 @@ const createSection = (title, items, accentClass) => {
 const createTargetCard = (target, marketSummary) => {
   const section = document.createElement("section");
   section.className =
-    "space-y-6 rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-8 shadow";
+    "space-y-8 rounded-3xl border border-indigo-100/80 bg-gradient-to-br from-indigo-50/80 via-white to-cyan-50/60 backdrop-blur-sm p-8 lg:p-10 shadow-xl";
 
   if (marketSummary) {
     const summary = document.createElement("div");
     summary.className =
-      "rounded-2xl border border-indigo-100 bg-white/70 p-6 shadow-sm";
+      "rounded-2xl border border-indigo-200/60 bg-white/90 backdrop-blur-sm p-6 lg:p-8 shadow-lg";
     const heading = document.createElement("h2");
-    heading.className = "text-lg font-semibold text-indigo-600";
+    heading.className = "text-xl font-semibold text-indigo-700 mb-3";
     heading.textContent = "Market snapshot";
     const body = document.createElement("p");
-    body.className = "mt-2 text-sm leading-6 text-slate-600";
+    body.className = "mt-2 text-base leading-7 text-slate-700";
     body.textContent = marketSummary;
     summary.append(heading, body);
     section.appendChild(summary);
@@ -289,17 +290,17 @@ const createTargetCard = (target, marketSummary) => {
 
   const header = document.createElement("header");
   header.className =
-    "flex flex-col gap-6 md:flex-row md:items-center md:justify-between";
+    "flex flex-col gap-6 md:flex-row md:items-center md:justify-between pb-4 border-b border-slate-200/60";
 
   const companyInfo = document.createElement("div");
-  companyInfo.className = "flex flex-col gap-1";
+  companyInfo.className = "flex flex-col gap-2";
 
   const titleWrapper = document.createElement("div");
   const title = document.createElement("h1");
-  title.className = "text-2xl font-bold text-slate-900";
+  title.className = "text-3xl lg:text-4xl font-bold text-slate-900";
   title.textContent = target.company_name || "Target company";
   const category = document.createElement("p");
-  category.className = "text-sm text-slate-500";
+  category.className = "text-sm font-medium text-indigo-600 uppercase tracking-wide";
   category.textContent = target.category || "";
 
   titleWrapper.append(title, category);
@@ -330,33 +331,37 @@ const createTargetCard = (target, marketSummary) => {
 const createCompetitorCard = (competitor) => {
   const article = document.createElement("article");
   article.className =
-    "group rounded-3xl border border-slate-200 bg-white/95 p-6 shadow transition hover:-translate-y-1 hover:shadow-lg";
+    "group rounded-3xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-8 lg:p-10 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-slate-300/80";
 
   const header = document.createElement("header");
-  header.className = "mb-5";
+  header.className = "mb-6 pb-6 border-b border-slate-200/60";
 
   const info = document.createElement("div");
   const title = document.createElement("h3");
-  title.className = "text-lg font-semibold text-slate-900";
+  title.className = "text-2xl font-bold text-slate-900 mb-2";
   title.textContent = competitor.company_name || "Competitor";
   
   // Add website URL directly under the competitor name
   const website = competitor.website || "";
+  let websiteLink = null;
   if (website) {
-    const websiteLink = document.createElement("a");
+    websiteLink = document.createElement("a");
     websiteLink.href = website;
     websiteLink.target = "_blank";
     websiteLink.rel = "noopener noreferrer";
-    websiteLink.className = "text-sm text-slate-500 hover:text-indigo-600 mt-1 block break-all";
+    websiteLink.className = "text-sm text-indigo-600 hover:text-indigo-700 mt-1 mb-3 block break-all transition-colors duration-200 font-medium";
     websiteLink.textContent = website;
-    info.appendChild(websiteLink);
   }
   
   const category = document.createElement("p");
-  category.className = "text-xs uppercase tracking-wide text-slate-500 mt-1";
+  category.className = "text-xs uppercase tracking-wider text-indigo-600 font-semibold mt-2";
   category.textContent = competitor.category || "Market competitor";
 
-  info.append(title, category);
+  info.appendChild(title);
+  if (websiteLink) {
+    info.appendChild(websiteLink);
+  }
+  info.appendChild(category);
   header.append(info);
 
   const grid = document.createElement("div");
@@ -381,17 +386,22 @@ const createCompetitorCard = (competitor) => {
 
 const createCompetitorGrid = (competitors) => {
   const section = document.createElement("section");
-  section.className = "space-y-6";
+  section.className = "space-y-8";
 
   const heading = document.createElement("h2");
-  heading.className = "text-xl font-semibold text-slate-800";
+  heading.className = "text-3xl font-bold text-slate-900 mb-2";
   heading.textContent = "Competitive landscape";
+  
+  const subheading = document.createElement("p");
+  subheading.className = "text-base text-slate-600 mb-6";
+  subheading.textContent = "Detailed analysis of your competitive landscape";
 
   section.appendChild(heading);
+  section.appendChild(subheading);
 
   if (!competitors || competitors.length === 0) {
     const empty = document.createElement("p");
-    empty.className = "rounded-2xl border border-slate-200 bg-white/90 p-6 text-sm text-slate-500 shadow-sm";
+    empty.className = "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-8 text-base text-slate-500 shadow-md text-center";
     empty.textContent =
       "No close competitors found. Try running the analysis with another target company.";
     section.appendChild(empty);
@@ -399,7 +409,7 @@ const createCompetitorGrid = (competitors) => {
   }
 
   const grid = document.createElement("div");
-  grid.className = "grid grid-cols-1 gap-6 xl:grid-cols-2";
+  grid.className = "grid grid-cols-1 gap-8";
   competitors.forEach((competitor) => {
     grid.appendChild(createCompetitorCard(competitor));
   });

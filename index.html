@@ -11,19 +11,22 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="css/styles.css" />
     <script defer src="js/app.js"></script>
   </head>
   <body class="bg-slate-100 text-slate-900 antialiased">
     <main class="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-12 sm:px-6 lg:px-8">
-      <header class="mb-10 space-y-4 text-center">
-        <p class="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-4 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-500 shadow-sm">
+      <header class="mb-12 space-y-5 text-center">
+        <p class="inline-flex items-center gap-2 rounded-full border border-indigo-200/60 bg-white/80 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-600 shadow-sm">
           Competitive enablement
         </p>
-        <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+        <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
           Generate competitive battlecards in minutes
         </h1>
-        <p class="mx-auto max-w-3xl text-base text-slate-600">
+        <p class="mx-auto max-w-3xl text-lg leading-relaxed text-slate-600">
           Paste any company URL to uncover competitors, SWOT insights, objection handling tips, and go-to-market strategy in a single, polished battlecard.
         </p>
       </header>
@@ -31,7 +34,7 @@
       <section class="mx-auto w-full max-w-3xl">
         <form
           id="analyze-form"
-          class="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm transition focus-within:border-indigo-300 focus-within:shadow-md"
+          class="rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-lg transition-all duration-300 focus-within:border-indigo-400 focus-within:shadow-xl focus-within:shadow-indigo-100/50"
         >
           <label for="company-url" class="block text-sm font-medium text-slate-700">
             Company website
@@ -49,7 +52,7 @@
             <button
               id="submit-btn"
               type="submit"
-              class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-indigo-300"
+              class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-indigo-700 hover:shadow-lg hover:scale-[1.02] disabled:cursor-not-allowed disabled:bg-indigo-300 disabled:hover:scale-100"
             >
               Generate battlecard
             </button>
@@ -87,8 +90,8 @@
         </div>
       </section>
 
-      <section id="results" class="mt-10 hidden fade-in">
-        <div class="rounded-3xl border border-slate-200 bg-white/95 p-8 shadow-lg">
+      <section id="results" class="mt-12 hidden fade-in">
+        <div class="rounded-3xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-8 shadow-xl">
           <p class="text-sm text-slate-500">
             Your battlecard will appear here once the analysis completes.
           </p>
