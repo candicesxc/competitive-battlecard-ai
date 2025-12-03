@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 from ..models.company_profile import CompanyProfile, CompetitorStub
 from .analysis_service import AnalysisError, _json_completion
-from .exa_client import exa
+from .exa_client import cached_search_and_contents
 from .search_service import extract_domain
 
 logger = logging.getLogger(__name__)
@@ -74,24 +74,23 @@ async def _collect_search_snippets_for_company(
         if target_audience:
             queries.append(f"best {industry} tools for {target_audience}")
 
-    # Execute searches
-    search_tasks = []
+    # Execute searches sequentially to respect rate limiting
+    # The rate limiter will ensure proper spacing between calls
+    search_results_list = []
     for query in queries[:6]:  # Limit to 6 queries
-        search_tasks.append(
-            asyncio.to_thread(
-                exa.search_and_contents,
+        try:
+            result = await cached_search_and_contents(
                 query,
                 num_results=8,
                 text={"max_characters": 2000},
             )
-        )
+            search_results_list.append(result)
+        except Exception as exc:
+            logger.warning("Exa search failed for '%s': %s", query, exc)
+            search_results_list.append(exc)
 
     try:
-        search_results_list = await asyncio.gather(
-            *search_tasks, return_exceptions=True
-        )
-
-        for query, results in zip(queries, search_results_list):
+        for query, results in zip(queries[:6], search_results_list):
             if isinstance(results, Exception):
                 logger.warning("Exa search failed for '%s': %s", query, results)
                 continue
@@ -239,8 +238,7 @@ async def _resolve_official_website(name: str) -> str:
 
     for query in queries[:2]:  # Try up to 2 queries
         try:
-            results = await asyncio.to_thread(
-                exa.search_and_contents,
+            results = await cached_search_and_contents(
                 query,
                 num_results=5,
                 text={"max_characters": 500},

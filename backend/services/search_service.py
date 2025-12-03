@@ -5,7 +5,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from .exa_client import exa
+from .exa_client import cached_search_and_contents
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,7 @@ async def _exa_search_request(query: str, num_results: int = 10) -> Dict[str, An
     """Perform an Exa search and return results in the expected format."""
 
     try:
-        results = await asyncio.to_thread(
-            exa.search_and_contents,
+        results = await cached_search_and_contents(
             query,
             num_results=num_results,
             text={"max_characters": 500},

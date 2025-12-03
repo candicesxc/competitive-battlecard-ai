@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 import httpx
 
 from ..models.company_profile import CompanyProfile
-from .exa_client import exa
+from .exa_client import cached_find_similar_and_contents, cached_search_and_contents
 from .search_service import extract_domain
 
 logger = logging.getLogger(__name__)
@@ -108,8 +108,7 @@ async def find_competitor_candidates_with_exa(
     # Step 1: Use Exa "find_similar" search
     try:
         logger.info("Using Exa find_similar for %s", target_url)
-        similar_results = await asyncio.to_thread(
-            exa.find_similar_and_contents,
+        similar_results = await cached_find_similar_and_contents(
             target_url,
             num_results=10,
             use_autoprompt=True,
@@ -165,24 +164,24 @@ async def find_competitor_candidates_with_exa(
         queries.append(f"{core_products[0]} competitors")
 
     # Step 3: Execute keyword searches
-    search_tasks = []
+    # Use sequential calls instead of gather to respect rate limiting
+    # The rate limiter will ensure proper spacing between calls
+    search_results_list = []
     for query in queries[:4]:  # Limit to 4 queries to control costs
-        # Create coroutine for each query - wrap sync call in asyncio.to_thread
-        search_tasks.append(
-            asyncio.to_thread(
-                exa.search_and_contents,
+        try:
+            result = await cached_search_and_contents(
                 query,
                 num_results=5,
                 text={"max_characters": 2000},
             )
-        )
+            search_results_list.append(result)
+        except Exception as exc:
+            logger.warning("Exa search failed for '%s': %s", query, exc)
+            search_results_list.append(exc)
 
     try:
-        search_results_list = await asyncio.gather(
-            *search_tasks, return_exceptions=True
-        )
 
-        for query, results in zip(queries, search_results_list):
+        for query, results in zip(queries[:4], search_results_list):
             if isinstance(results, Exception):
                 logger.warning("Exa search failed for '%s': %s", query, results)
                 continue
