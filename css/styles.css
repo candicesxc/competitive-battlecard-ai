@@ -1,8 +1,9 @@
 :root {
   color-scheme: light;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+  font-family: "Alan Sans", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   --font-newsreader: "Newsreader", serif;
+  --font-alan-sans: "Alan Sans", sans-serif;
 }
 
 body {
@@ -68,13 +69,12 @@ body {
 }
 
 .section-title {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   letter-spacing: 0.1em;
   font-weight: 600;
   text-transform: uppercase;
   font-family: var(--font-newsreader);
   font-optical-sizing: auto;
-  font-weight: 600;
 }
 
 /* Modern SaaS enhancements */
@@ -155,5 +155,55 @@ article:hover {
 /* Better list styling */
 ul {
   padding-left: 0;
+}
+
+/* Body text styling with Alan Sans */
+body {
+  font-family: var(--font-alan-sans);
+  font-optical-sizing: auto;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* Increase body text size in cards and sections */
+article p,
+section p,
+.text-slate-700,
+.text-slate-600,
+ul li {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+/* Market snapshot section styling */
+.market-snapshot-section {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 2px solid #bae6fd;
+  border-radius: 1rem;
+  padding: 1.5rem 2rem;
+  margin-bottom: 2rem;
+}
+
+/* Competitive landscape heading styling */
+.competitive-landscape-header {
+  text-align: center;
+  margin-bottom: 3rem;
+  padding-bottom: 2rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.competitive-landscape-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.competitive-landscape-subtitle {
+  font-size: 1.125rem;
+  color: #64748b;
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
