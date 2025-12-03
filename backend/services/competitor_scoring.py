@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import List
@@ -87,9 +88,8 @@ async def score_competitors(
     if not competitors:
         return []
 
-    # Fetch page text for each competitor
-    competitor_data: List[dict] = []
-    for competitor in competitors:
+    # Fetch page text for each competitor in parallel
+    async def _fetch_competitor_data(competitor):
         name = competitor.get("name", "")
         website = competitor.get("website", "")
         description = competitor.get("description", "")
@@ -102,14 +102,23 @@ async def score_competitors(
             except Exception as exc:
                 logger.debug("Failed to fetch page text for %s: %s", website, exc)
 
-        competitor_data.append(
-            {
-                "name": name,
-                "website": website,
-                "description": description,
-                "text_excerpt": text_excerpt,
-            }
-        )
+        return {
+            "name": name,
+            "website": website,
+            "description": description,
+            "text_excerpt": text_excerpt,
+        }
+
+    competitor_data = await asyncio.gather(
+        *[_fetch_competitor_data(comp) for comp in competitors],
+        return_exceptions=True
+    )
+    
+    # Filter out exceptions and convert to list
+    competitor_data = [
+        data for data in competitor_data
+        if not isinstance(data, Exception)
+    ]
 
     # Build the prompt
     system_prompt = "You are a competitive intelligence strategist and JSON expert."

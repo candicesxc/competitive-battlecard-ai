@@ -367,7 +367,7 @@ const createCompetitorCard = (competitor) => {
     createSection("Pricing", competitor.pricing, "text-blue-600"),
     createSection("Strengths", competitor.strengths, "text-emerald-600"),
     createSection("Weaknesses", competitor.weaknesses, "text-slate-500"),
-    createSection("How we win", competitor.how_we_win, "text-red-500"),
+    createSection("Key Differentiators", competitor.how_we_win, "text-red-500"),
     createSection(
       "Potential landmines",
       competitor.potential_landmines,
