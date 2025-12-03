@@ -65,8 +65,8 @@ class BattlecardCrew:
         )
         self.strategist_agent = Agent(
             role="Competitive Strategist",
-            goal="Create persuasive 'How We Win' points and anticipate objections.",
-            backstory="A sales strategist crafting battle-tested talk tracks.",
+            goal="Create competitor-specific 'Key Differentiators' and anticipate unique objections.",
+            backstory="A sales strategist crafting battle-tested talk tracks tailored to each competitor.",
         )
         self.designer_agent = Agent(
             role="Visual Storyteller",
@@ -244,9 +244,12 @@ class BattlecardCrew:
         url: Optional[str],
         metadata: Optional[Dict[str, Any]] = None,
     ) -> CompanyResearch:
-        profile = await search_service.search_company_profile(url or name)
+        # Fetch profile and news in parallel
+        profile, news_payload = await asyncio.gather(
+            search_service.search_company_profile(url or name),
+            search_service.search_company_news(name),
+        )
         overview = search_service.parse_company_overview(profile)
-        news_payload = await search_service.search_company_news(name)
 
         knowledge_graph = (
             profile.get("knowledgeGraph")
@@ -351,11 +354,14 @@ class BattlecardCrew:
         logger.info("AnalystAgent: generating profiles and SWOT insights")
 
         target_company = enriched["target"]
-        target_profile = await analysis_service.generate_company_profile(
-            target_company.company_name, target_company.raw_context
-        )
-        target_strengths = await analysis_service.generate_strengths_weaknesses(
-            target_company.company_name, target_company.raw_context
+        # Generate profile and strengths in parallel
+        target_profile, target_strengths = await asyncio.gather(
+            analysis_service.generate_company_profile(
+                target_company.company_name, target_company.raw_context
+            ),
+            analysis_service.generate_strengths_weaknesses(
+                target_company.company_name, target_company.raw_context
+            ),
         )
 
         target_payload = {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from typing import Any, Dict, Iterable, List, Optional
@@ -7,6 +8,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from openai import AsyncOpenAI
 
 from ..config import get_settings
+from .cache import get_cached_result, set_cached_result
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +54,16 @@ async def _json_completion(
 async def generate_strengths_weaknesses(company_name: str, context: Dict[str, Any]) -> Dict[str, Any]:
     """Generate strengths and weaknesses for a company."""
 
+    # Create cache key from company name and a hash of context
+    context_str = json.dumps(context, sort_keys=True)
+    context_hash = hashlib.md5(context_str.encode()).hexdigest()[:8]
+    cache_key = f"strengths:{company_name}:{context_hash}"
+    
+    cached = get_cached_result(cache_key, max_age_seconds=3600)
+    if cached:
+        logger.debug("Using cached strengths/weaknesses for %s", company_name)
+        return cached
+
     prompt = (
         f"Given the following public data about {company_name}, write 3 bullet points of strengths "
         "and 3 bullet points of weaknesses in a concise, professional tone. Focus on product features, "
@@ -75,11 +87,23 @@ async def generate_strengths_weaknesses(company_name: str, context: Dict[str, An
     result = await _json_completion(messages, model=settings.analyst_model)
     if "company_name" not in result:
         result["company_name"] = company_name
+    
+    set_cached_result(cache_key, result)
     return result
 
 
 async def generate_company_profile(company_name: str, context: Dict[str, Any]) -> Dict[str, Any]:
     """Generate structured overview, products, and pricing details for a company."""
+
+    # Create cache key from company name and a hash of context
+    context_str = json.dumps(context, sort_keys=True)
+    context_hash = hashlib.md5(context_str.encode()).hexdigest()[:8]
+    cache_key = f"profile:{company_name}:{context_hash}"
+    
+    cached = get_cached_result(cache_key, max_age_seconds=3600)
+    if cached:
+        logger.debug("Using cached company profile for %s", company_name)
+        return cached
 
     prompt = (
         f"Using the provided research snippets about {company_name}, create a concise company profile. "
@@ -105,6 +129,8 @@ async def generate_company_profile(company_name: str, context: Dict[str, Any]) -
     result = await _json_completion(messages)
     result.setdefault("company_name", company_name)
     result.pop("logo_url", None)
+    
+    set_cached_result(cache_key, result)
     return result
 
 
@@ -113,31 +139,68 @@ async def generate_strategy_summary(
     competitor_name: str,
     context: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Generate 'How We Win' and 'Potential Landmines' insights for a competitor."""
+    """Generate 'Key Differentiators' and 'Potential Landmines' insights for a competitor."""
+
+    target_data = context.get("target", {})
+    target_profile = context.get("target_profile", {})
+    competitor_data = context.get("competitor", {})
+    
+    # Extract key comparison points
+    target_products = target_data.get("products", []) or target_profile.get("core_products", [])
+    competitor_products = competitor_data.get("products", []) or competitor_data.get("profile_metadata", {}).get("core_products", [])
+    
+    target_audience = target_data.get("target_audience") or target_profile.get("target_audience", "")
+    competitor_audience = competitor_data.get("target_audience") or competitor_data.get("profile_metadata", {}).get("target_audience", "")
+    
+    target_strengths = target_data.get("strengths", [])
+    competitor_strengths = competitor_data.get("strengths", [])
+    
+    target_value_prop = target_data.get("summary") or target_profile.get("summary", "")
+    competitor_value_prop = competitor_data.get("summary") or competitor_data.get("profile_metadata", {}).get("summary", "")
 
     prompt = (
-        f"Compare {target_company} with {competitor_name}. "
-        "Write 3 bullet points for How We Win — reasons customers prefer our solution. "
-        "Write 3 bullet points for Potential Landmines — common objections and how to address them. "
-        "Keep the tone persuasive yet factual. Return JSON only with keys 'how_we_win' and 'potential_landmines'."
+        f"You are comparing {target_company} (the target company) with {competitor_name} (a competitor). "
+        f"Generate unique, competitor-specific insights based on the actual differences between these two companies.\n\n"
+        f"Target Company ({target_company}):\n"
+        f"- Products: {target_products}\n"
+        f"- Target Audience: {target_audience}\n"
+        f"- Key Strengths: {target_strengths}\n"
+        f"- Value Proposition: {target_value_prop}\n\n"
+        f"Competitor ({competitor_name}):\n"
+        f"- Products: {competitor_products}\n"
+        f"- Target Audience: {competitor_audience}\n"
+        f"- Key Strengths: {competitor_strengths}\n"
+        f"- Value Proposition: {competitor_value_prop}\n\n"
+        f"Based on these specific differences, generate:\n"
+        f"1. Key Differentiators: Write 3 unique bullet points explaining how {target_company} wins against {competitor_name} specifically. "
+        f"Focus on differences in product features, target audience, value proposition, and unique strengths. "
+        f"These must be specific to this competitor comparison, not generic advantages.\n"
+        f"2. Potential Landmines: Write 3 unique bullet points about objections or challenges when competing against {competitor_name} specifically. "
+        f"These should address this competitor's unique strengths, different positioning, or areas where they might have an advantage. "
+        f"These must be specific to this competitor, not generic objections.\n\n"
+        f"IMPORTANT: The differentiators and landmines must be unique to this specific competitor comparison. "
+        f"No two competitors should receive identical or near-identical output. "
+        f"Reference specific product differences, audience differences, and value prop differences.\n\n"
+        f"Return JSON only with keys 'key_differentiators' and 'potential_landmines' (arrays of strings)."
     )
 
     messages = [
-        {"role": "system", "content": "You are an expert competitive strategist for enterprise SaaS deals."},
+        {"role": "system", "content": "You are an expert competitive strategist for enterprise SaaS deals. You create unique, competitor-specific battlecard insights by comparing specific differences between companies."},
         {
             "role": "user",
-            "content": json.dumps(
-                {
-                    "instructions": prompt,
-                    "target_company": target_company,
-                    "competitor_context": context,
-                }
-            ),
+            "content": prompt,
         },
     ]
 
     result = await _json_completion(messages, model=settings.strategist_model)
     result.setdefault("company_name", competitor_name)
+    
+    # Map the new key names to the old ones for backward compatibility
+    if "key_differentiators" in result:
+        result["how_we_win"] = result.pop("key_differentiators")
+    elif "how_we_win" not in result:
+        result["how_we_win"] = []
+    
     return result
 
 

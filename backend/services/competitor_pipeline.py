@@ -607,6 +607,10 @@ def _fallback_competitor_type(score_bundle: Dict[str, float]) -> str:
     return "adjacent"
 
 
+# Note: This function appears to be legacy code and may not be actively used.
+# The actual competitor scoring is handled by competitor_scoring.score_competitors
+COMPETITOR_RANKING_PROMPT = """Compare competitors against the target company profile and score their similarity."""
+
 def _prepare_ranking_payload(target_profile: Dict[str, Any], candidates: List[Dict[str, Any]]):
     simplified_candidates = []
     for candidate in candidates:
