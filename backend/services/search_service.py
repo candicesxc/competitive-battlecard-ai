@@ -51,8 +51,30 @@ async def _exa_search_request(query: str, num_results: int = 10) -> Dict[str, An
             "knowledge_graph": {},
         }
     except Exception as exc:
-        logger.error("Exa search failed: %s", exc)
-        raise SearchProviderError("Search provider request failed") from exc
+        # Extract more detailed error information
+        exc_type = type(exc).__name__
+        exc_msg = str(exc)
+        
+        # Provide more specific error messages based on exception type
+        if "401" in exc_msg or "unauthorized" in exc_msg.lower() or "api key" in exc_msg.lower():
+            error_msg = "Search provider authentication failed. Please check API key configuration."
+        elif "429" in exc_msg or "rate limit" in exc_msg.lower():
+            error_msg = "Search provider rate limit exceeded. Please try again later."
+        elif "timeout" in exc_msg.lower() or "timed out" in exc_msg.lower():
+            error_msg = "Search provider request timed out. Please try again."
+        elif "connection" in exc_msg.lower() or "network" in exc_msg.lower():
+            error_msg = f"Search provider connection error: {exc_msg}"
+        else:
+            error_msg = f"Search provider request failed: {exc_msg}"
+        
+        logger.error(
+            "Exa search failed [type=%s, query=%s]: %s",
+            exc_type,
+            query[:100] if query else "N/A",
+            exc_msg,
+            exc_info=True,
+        )
+        raise SearchProviderError(error_msg) from exc
 
 
 async def _search_request(kind: str, payload: Dict[str, Any]) -> Dict[str, Any]:
