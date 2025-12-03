@@ -1,6 +1,13 @@
 /**
  * PDF generation utility for battlecards
  * Uses jsPDF to create a formatted PDF from battlecard data
+ * 
+ * PDF styling improvements:
+ * - Uses app color palette (indigo/slate) for consistency
+ * - Clean typography hierarchy with proper font sizes and weights
+ * - Subtle accent lines under section titles instead of heavy boxes
+ * - Generous whitespace and spacing between sections
+ * - No borders or boxes around content blocks
  */
 
 /**
@@ -35,11 +42,25 @@ function generateBattlecardPdf(battlecard) {
   const margin = 20;
   const maxWidth = pageWidth - (margin * 2);
   let yPosition = margin;
-  const lineHeight = 7;
-  const sectionSpacing = 10;
-  const titleSize = 18;
-  const sectionTitleSize = 14;
-  const bodySize = 11;
+  
+  // Typography settings - matching app visual language
+  const lineHeight = 6.5;
+  const sectionSpacing = 12; // Increased spacing between sections
+  const titleSize = 22; // Larger main title
+  const sectionTitleSize = 13; // Section headers
+  const bodySize = 10.5; // Body text
+  
+  // Color palette from app (RGB values)
+  const colors = {
+    slate900: [30, 41, 59],      // Main text
+    slate700: [51, 65, 85],      // Body text
+    slate600: [71, 85, 105],     // Secondary text
+    slate500: [100, 116, 139],    // Muted text
+    slate400: [148, 163, 184],    // Page numbers
+    indigo600: [79, 70, 229],     // Accent color
+    indigo500: [99, 102, 241],    // Accent color variant
+    slate200: [226, 232, 240],   // Subtle accent lines
+  };
 
   // Helper function to add a new page if needed
   const checkPageBreak = (requiredSpace = 20) => {
@@ -57,7 +78,7 @@ function generateBattlecardPdf(battlecard) {
   };
 
   // Helper function to add text with word wrapping
-  const addText = (text, fontSize, isBold = false, color = [0, 0, 0]) => {
+  const addText = (text, fontSize, isBold = false, color = colors.slate700, lineSpacing = lineHeight) => {
     if (!text || !text.trim()) return;
     
     doc.setFontSize(fontSize);
@@ -65,11 +86,72 @@ function generateBattlecardPdf(battlecard) {
     doc.setTextColor(color[0], color[1], color[2]);
     
     const lines = splitText(text, fontSize, maxWidth);
-    const textHeight = lines.length * lineHeight;
+    const textHeight = lines.length * lineSpacing;
     
     checkPageBreak(textHeight);
     
     lines.forEach((line) => {
+      if (yPosition + lineSpacing > pageHeight - margin) {
+        doc.addPage();
+        yPosition = margin;
+      }
+      doc.text(line, margin, yPosition);
+      yPosition += lineSpacing;
+    });
+  };
+
+  // Helper function to add a subtle accent line under section titles
+  const addAccentLine = () => {
+    const lineY = yPosition - 2;
+    doc.setDrawColor(colors.slate200[0], colors.slate200[1], colors.slate200[2]);
+    doc.setLineWidth(0.3);
+    doc.line(margin, lineY, pageWidth - margin, lineY);
+  };
+
+  // Title: Company name - large and bold
+  checkPageBreak(35);
+  doc.setFontSize(titleSize);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(colors.slate900[0], colors.slate900[1], colors.slate900[2]);
+  const companyName = battlecard.companyName || "Competitor Battlecard";
+  doc.text(companyName, margin, yPosition);
+  yPosition += 10;
+
+  // Subtitle: "Competitor Battlecard" - smaller and muted
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(colors.slate500[0], colors.slate500[1], colors.slate500[2]);
+  doc.text("Competitor Battlecard", margin, yPosition);
+  yPosition += 6;
+
+  // Company URL if available - small and secondary
+  if (battlecard.companyUrl) {
+    doc.setFontSize(9);
+    doc.setTextColor(colors.slate600[0], colors.slate600[1], colors.slate600[2]);
+    doc.text(battlecard.companyUrl, margin, yPosition);
+    yPosition += 8;
+  }
+
+  yPosition += sectionSpacing; // Extra space before content
+
+  // Process all sections
+  battlecard.sections.forEach((section, index) => {
+    if (!section.body || !section.body.trim()) return;
+
+    checkPageBreak(35);
+
+    // Add spacing before section (except first one)
+    if (index > 0) {
+      yPosition += sectionSpacing;
+    }
+
+    // Section title - bold and larger
+    doc.setFontSize(sectionTitleSize);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(colors.slate900[0], colors.slate900[1], colors.slate900[2]);
+    
+    const titleLines = splitText(section.title, sectionTitleSize, maxWidth);
+    titleLines.forEach((line) => {
       if (yPosition + lineHeight > pageHeight - margin) {
         doc.addPage();
         yPosition = margin;
@@ -78,82 +160,52 @@ function generateBattlecardPdf(battlecard) {
       yPosition += lineHeight;
     });
     
-    doc.setTextColor(0, 0, 0); // Reset to black
-  };
+    // Add subtle accent line under section title
+    addAccentLine();
+    yPosition += 5; // Space after accent line
 
-  // Title: Company name
-  checkPageBreak(30);
-  doc.setFontSize(titleSize);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(30, 41, 59); // slate-900
-  const companyName = battlecard.companyName || "Competitor Battlecard";
-  doc.text(companyName, margin, yPosition);
-  yPosition += 12;
-
-  // Subtitle: "Competitor Battlecard"
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(100, 116, 139); // slate-500
-  doc.text("Competitor Battlecard", margin, yPosition);
-  yPosition += 8;
-
-  // Company URL if available
-  if (battlecard.companyUrl) {
-    doc.setFontSize(10);
-    doc.setTextColor(71, 85, 105); // slate-600
-    doc.text(battlecard.companyUrl, margin, yPosition);
-    yPosition += 8;
-  }
-
-  yPosition += sectionSpacing;
-
-  // Summary if available
-  if (battlecard.summary) {
-    checkPageBreak(30);
-    addText(battlecard.summary, bodySize, false, [30, 41, 59]);
-    yPosition += sectionSpacing;
-  }
-
-  // Process all sections
-  battlecard.sections.forEach((section) => {
-    if (!section.body || !section.body.trim()) return;
-
-    checkPageBreak(30);
-
-    // Section title
-    addText(section.title, sectionTitleSize, true, [30, 41, 59]);
-    yPosition += 3; // Small gap between title and body
-
-    // Section body
-    // Handle bullet points - if body contains "•" or starts with bullet-like patterns
+    // Section body - regular weight, readable size
     let bodyText = section.body;
-    const hasBullets = bodyText.includes("•") || bodyText.includes("- ");
+    const hasBullets = bodyText.includes("•") || bodyText.includes("- ") || bodyText.includes("* ");
     
     if (hasBullets) {
-      // Split by bullet points and format each
+      // Split by bullet points and format each with indentation
       const lines = bodyText.split(/\n/).filter(line => line.trim());
       lines.forEach((line) => {
         const trimmedLine = line.trim();
         if (trimmedLine) {
-          // Replace bullet symbols with a simple dash for PDF
-          const cleanLine = trimmedLine.replace(/^[•\-\*]\s*/, "- ");
-          addText(cleanLine, bodySize, false, [51, 65, 85]); // slate-700
+          // Clean bullet symbols and add indentation
+          const cleanLine = trimmedLine.replace(/^[•\-\*]\s*/, "");
+          // Add text with slight indentation for bullets
+          doc.setFontSize(bodySize);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(colors.slate700[0], colors.slate700[1], colors.slate700[2]);
+          
+          const bulletLines = splitText(`• ${cleanLine}`, bodySize, maxWidth - 5);
+          bulletLines.forEach((bulletLine, idx) => {
+            if (yPosition + lineHeight > pageHeight - margin) {
+              doc.addPage();
+              yPosition = margin;
+            }
+            // First line has bullet, subsequent lines are indented
+            const xPos = idx === 0 ? margin : margin + 5;
+            doc.text(bulletLine, xPos, yPosition);
+            yPosition += lineHeight * 1.2; // Slightly more spacing for bullet lists
+          });
         }
       });
     } else {
-      // Regular paragraph text
-      addText(bodyText, bodySize, false, [51, 65, 85]);
+      // Regular paragraph text with proper line spacing
+      addText(bodyText, bodySize, false, colors.slate700, lineHeight * 1.3);
     }
-
-    yPosition += sectionSpacing;
   });
 
-  // Add page numbers
+  // Add page numbers - subtle and in footer
   const totalPages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    doc.setFontSize(9);
-    doc.setTextColor(148, 163, 184); // slate-400
+    doc.setFontSize(8);
+    doc.setTextColor(colors.slate400[0], colors.slate400[1], colors.slate400[2]);
     doc.text(
       `Page ${i} of ${totalPages}`,
       pageWidth - margin - 20,
