@@ -300,13 +300,15 @@ const suggestDomainCompletion = (value) => {
   return null;
 };
 
+// Simplified section creation - removed heavy borders and boxes
+// Uses whitespace and spacing instead of containers with borders
 const createSection = (title, items, accentClass) => {
   const section = document.createElement("div");
-  section.className =
-    "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md transition-all duration-200 hover:shadow-lg";
+  // Removed border, rounded corners, background, and shadow for cleaner look
+  section.className = "py-4";
 
   const heading = document.createElement("h3");
-  heading.className = `section-title mb-3 ${accentClass}`;
+  heading.className = `section-title mb-4 ${accentClass}`;
   heading.textContent = title;
   section.appendChild(heading);
 
@@ -319,7 +321,8 @@ const createSection = (title, items, accentClass) => {
   }
 
   const list = document.createElement("ul");
-  list.className = "space-y-2.5 text-sm leading-relaxed text-slate-700 list-none";
+  // Increased spacing and removed list styling for cleaner appearance
+  list.className = "space-y-3 text-base leading-relaxed text-slate-700 list-none";
 
   items.forEach((item) => {
     const li = document.createElement("li");
@@ -332,13 +335,14 @@ const createSection = (title, items, accentClass) => {
   return section;
 };
 
+// Simplified pricing section - removed heavy borders and boxes
 const createPricingSection = (title, items, accentClass) => {
   const section = document.createElement("div");
-  section.className =
-    "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md transition-all duration-200 hover:shadow-lg col-span-full";
+  // Removed border, rounded corners, background, and shadow for cleaner look
+  section.className = "py-4 col-span-full";
 
   const heading = document.createElement("h3");
-  heading.className = `section-title mb-3 ${accentClass}`;
+  heading.className = `section-title mb-4 ${accentClass}`;
   heading.textContent = title;
   section.appendChild(heading);
 
@@ -352,7 +356,8 @@ const createPricingSection = (title, items, accentClass) => {
 
   // Create a single column layout for pricing (full width)
   const list = document.createElement("ul");
-  list.className = "space-y-2.5 text-sm leading-relaxed text-slate-700 list-none";
+  // Increased spacing for better readability
+  list.className = "space-y-3 text-base leading-relaxed text-slate-700 list-none";
 
   items.forEach((item) => {
     const li = document.createElement("li");
@@ -367,28 +372,30 @@ const createPricingSection = (title, items, accentClass) => {
 
 // createScoreBar function removed - competitive score no longer displayed in UI
 
+// Simplified target card - removed heavy borders and boxes
+// Market snapshot is now clearly its own separate section
 const createTargetCard = (target, marketSummary) => {
   const section = document.createElement("section");
-  section.className =
-    "space-y-8 rounded-3xl border border-indigo-100/80 bg-gradient-to-br from-indigo-50/80 via-white to-cyan-50/60 backdrop-blur-sm p-8 lg:p-10 shadow-xl";
+  // Removed border, rounded corners, background gradient, and shadow for cleaner look
+  section.className = "space-y-12 py-6";
 
+  // Market snapshot as its own clearly separate section with proper heading
   if (marketSummary) {
-    const summary = document.createElement("div");
-    summary.className =
-      "market-snapshot-section rounded-2xl border-2 border-blue-300/60 bg-gradient-to-br from-blue-50/90 via-cyan-50/80 to-sky-50/90 backdrop-blur-sm p-6 lg:p-8 shadow-lg mb-8";
+    const marketSection = document.createElement("div");
+    marketSection.className = "market-snapshot-section mb-12";
     const heading = document.createElement("h2");
     heading.className = "text-2xl font-semibold text-blue-800 mb-4";
     heading.textContent = "Market snapshot";
     const body = document.createElement("p");
     body.className = "mt-2 text-base leading-7 text-slate-800 font-medium";
     body.textContent = marketSummary;
-    summary.append(heading, body);
-    section.insertBefore(summary, section.firstChild);
+    marketSection.append(heading, body);
+    section.appendChild(marketSection);
   }
 
+  // Company header - simplified, no border
   const header = document.createElement("header");
-  header.className =
-    "flex flex-col gap-6 md:flex-row md:items-center md:justify-between pb-4 border-b border-slate-200/60";
+  header.className = "flex flex-col gap-6 md:flex-row md:items-center md:justify-between pb-6";
 
   const companyInfo = document.createElement("div");
   companyInfo.className = "flex flex-col gap-2";
@@ -428,17 +435,19 @@ const createTargetCard = (target, marketSummary) => {
   return section;
 };
 
+// Simplified competitor card - removed heavy borders and boxes
 const createCompetitorCard = (competitor, index, isActive = false) => {
   const article = document.createElement("article");
-  article.className =
-    `competitor-card group rounded-3xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-8 lg:p-10 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-slate-300/80`;
+  // Removed border, rounded corners, background, and shadow for cleaner look
+  article.className = `competitor-card group py-6`;
   article.dataset.competitorIndex = index;
   if (!isActive) {
     article.classList.add("hidden");
   }
 
   const header = document.createElement("header");
-  header.className = "mb-6 pb-6 border-b border-slate-200/60";
+  // Removed border for cleaner look
+  header.className = "mb-8 pb-6";
 
   const info = document.createElement("div");
   const title = document.createElement("h3");
@@ -519,12 +528,13 @@ const createCompetitorGrid = (competitors) => {
     return section;
   }
 
-  // Create tabs container
+  // Create tabs container - removed separator line above tabs
   const tabsContainer = document.createElement("div");
   tabsContainer.className = "competitor-tabs-container mb-6";
   
   const tabsList = document.createElement("div");
-  tabsList.className = "flex flex-wrap gap-2 justify-center border-b border-slate-200 pb-4";
+  // Removed border-b (separator line) above tabs for cleaner look
+  tabsList.className = "flex flex-wrap gap-2 justify-center pb-4";
   
   competitors.forEach((competitor, index) => {
     const tab = document.createElement("button");

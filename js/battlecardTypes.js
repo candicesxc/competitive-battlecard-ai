@@ -189,17 +189,46 @@ function getSavedBattlecards() {
 
 /**
  * Saves a battlecard to localStorage
+ * Prevents duplicates by checking companyName + companyUrl combination
+ * If a duplicate exists, updates the existing entry with latest content
  * @param {CompetitorBattlecard} battlecard - Battlecard to save
  */
 function saveBattlecard(battlecard) {
   try {
     const saved = getSavedBattlecards();
-    // Remove any existing battlecard with the same id
-    const filtered = saved.filter(b => b.id !== battlecard.id);
-    // Add new battlecard and sort by createdAt (most recent first)
-    filtered.push(battlecard);
-    filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    localStorage.setItem("cbt_savedBattlecards", JSON.stringify(filtered));
+    
+    // Duplicate check: Use companyName + companyUrl as unique identifier
+    // Normalize URLs for comparison (remove trailing slashes, lowercase)
+    const normalizeUrl = (url) => {
+      if (!url) return "";
+      return url.trim().toLowerCase().replace(/\/+$/, "");
+    };
+    
+    const battlecardKey = `${battlecard.companyName || ""}_${normalizeUrl(battlecard.companyUrl || "")}`;
+    
+    // Check if a battlecard with the same companyName + companyUrl already exists
+    const existingIndex = saved.findIndex(b => {
+      const existingKey = `${b.companyName || ""}_${normalizeUrl(b.companyUrl || "")}`;
+      return existingKey === battlecardKey;
+    });
+    
+    let updated = saved;
+    
+    if (existingIndex >= 0) {
+      // Duplicate found: Update existing entry with latest content and timestamp
+      updated[existingIndex] = {
+        ...battlecard,
+        id: saved[existingIndex].id, // Keep original ID
+        createdAt: new Date().toISOString() // Update timestamp
+      };
+    } else {
+      // No duplicate: Add new battlecard
+      updated.push(battlecard);
+    }
+    
+    // Sort by createdAt (most recent first)
+    updated.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    localStorage.setItem("cbt_savedBattlecards", JSON.stringify(updated));
     return true;
   } catch (error) {
     console.warn("Error saving battlecard:", error);
