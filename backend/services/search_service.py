@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -27,7 +28,8 @@ async def _exa_search_request(query: str, num_results: int = 10) -> Dict[str, An
     """Perform an Exa search and return results in the expected format."""
 
     try:
-        results = await exa.search_and_contents(
+        results = await asyncio.to_thread(
+            exa.search_and_contents,
             query,
             num_results=num_results,
             text={"max_characters": 500},
