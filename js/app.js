@@ -95,8 +95,13 @@ const selectors = {
   progressFill: document.getElementById("progress-fill"),
   progressMessage: document.getElementById("progress-message"),
   results: document.getElementById("results"),
+  resultsContent: document.getElementById("results-content"),
   domainSuggestion: document.getElementById("domain-suggestion"),
   suggestionButton: document.getElementById("suggestion-button"),
+  savedBattlecardsContainer: document.getElementById("saved-battlecards-container"),
+  savedBattlecardsList: document.getElementById("saved-battlecards-list"),
+  pdfDownloadContainer: document.getElementById("pdf-download-container"),
+  downloadPdfBtn: document.getElementById("download-pdf-btn"),
 };
 
 const isValidUrl = (value) => {
@@ -119,6 +124,7 @@ let progress = 0;
 let progressTimer = null;
 let startTime = null;
 let elapsedTime = 0;
+let currentBattlecard = null; // Store current battlecard for PDF generation
 
 const getProgressMessage = (value, elapsedSeconds) => {
   const estimatedTotal = 120; // Estimated total time in seconds (2 minutes)
@@ -574,10 +580,11 @@ const createCompetitorGrid = (competitors) => {
   return section;
 };
 
-const renderBattlecards = (data) => {
-  if (!selectors.results) return;
+const renderBattlecards = (data, companyUrl = null) => {
+  if (!selectors.results || !selectors.resultsContent) return;
 
-  selectors.results.innerHTML = "";
+  // Clear previous content
+  selectors.resultsContent.innerHTML = "";
 
   const wrapper = document.createElement("div");
   wrapper.className = "space-y-12";
@@ -587,7 +594,7 @@ const renderBattlecards = (data) => {
   );
   wrapper.appendChild(createCompetitorGrid(data.competitors ?? []));
 
-  selectors.results.appendChild(wrapper);
+  selectors.resultsContent.appendChild(wrapper);
   toggleClass(selectors.results, "hidden", false);
 
   // Restart fade-in animation
@@ -595,6 +602,125 @@ const renderBattlecards = (data) => {
   // Trigger reflow
   void selectors.results.offsetWidth;
   selectors.results.classList.add("fade-in");
+
+  // Save battlecard to localStorage and update current battlecard state
+  if (typeof normalizeBattlecardData !== 'undefined') {
+    const normalized = normalizeBattlecardData(data, companyUrl || selectors.urlInput?.value || "");
+    currentBattlecard = normalized;
+    
+    // Save to localStorage
+    if (typeof saveBattlecard !== 'undefined') {
+      saveBattlecard(normalized);
+      updateSavedBattlecardsUI();
+    }
+    
+    // Show PDF download button
+    toggleClass(selectors.pdfDownloadContainer, "hidden", false);
+  }
+};
+
+/**
+ * Updates the saved battlecards UI
+ */
+const updateSavedBattlecardsUI = () => {
+  if (!selectors.savedBattlecardsContainer || !selectors.savedBattlecardsList) return;
+  
+  if (typeof getSavedBattlecards === 'undefined') return;
+  
+  const saved = getSavedBattlecards();
+  
+  if (saved.length === 0) {
+    toggleClass(selectors.savedBattlecardsContainer, "hidden", true);
+    return;
+  }
+  
+  // Clear existing buttons
+  selectors.savedBattlecardsList.innerHTML = "";
+  
+  // Create buttons for each saved battlecard
+  saved.forEach((battlecard) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-all duration-200 hover:bg-slate-50 hover:border-slate-400 hover:shadow";
+    button.textContent = battlecard.companyName;
+    button.dataset.battlecardId = battlecard.id;
+    
+    // Add click handler to load battlecard
+    button.addEventListener("click", () => {
+      loadSavedBattlecard(battlecard.id);
+    });
+    
+    // Add delete button
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "ml-1 text-slate-400 hover:text-red-500 transition-colors";
+    deleteBtn.innerHTML = "×";
+    deleteBtn.setAttribute("aria-label", "Delete battlecard");
+    deleteBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (confirm(`Delete battlecard for ${battlecard.companyName}?`)) {
+        if (typeof deleteBattlecard !== 'undefined') {
+          deleteBattlecard(battlecard.id);
+          updateSavedBattlecardsUI();
+        }
+      }
+    });
+    
+    button.appendChild(deleteBtn);
+    selectors.savedBattlecardsList.appendChild(button);
+  });
+  
+  toggleClass(selectors.savedBattlecardsContainer, "hidden", false);
+};
+
+/**
+ * Loads a saved battlecard and renders it
+ * @param {string} battlecardId - ID of the battlecard to load
+ */
+const loadSavedBattlecard = (battlecardId) => {
+  if (typeof getSavedBattlecards === 'undefined') return;
+  
+  const saved = getSavedBattlecards();
+  const battlecard = saved.find(b => b.id === battlecardId);
+  
+  if (!battlecard) {
+    showError("Battlecard not found.");
+    return;
+  }
+  
+  // Set current battlecard
+  currentBattlecard = battlecard;
+  
+  // Load the raw data and render it
+  if (battlecard.rawData) {
+    renderBattlecards(battlecard.rawData, battlecard.companyUrl);
+    // Scroll to results
+    selectors.results?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } else {
+    showError("Battlecard data is incomplete.");
+  }
+};
+
+/**
+ * Handles PDF download
+ */
+const handlePdfDownload = () => {
+  if (!currentBattlecard) {
+    showError("No battlecard available to download.");
+    return;
+  }
+  
+  if (typeof generateBattlecardPdf === 'undefined') {
+    showError("PDF generation is not available. Please refresh the page.");
+    return;
+  }
+  
+  try {
+    generateBattlecardPdf(currentBattlecard);
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    showError("Failed to generate PDF. Please try again.");
+  }
 };
 
 const handleSubmit = async (event) => {
@@ -616,6 +742,10 @@ const handleSubmit = async (event) => {
   }
 
   setLoading(true);
+  // Hide PDF button while loading
+  toggleClass(selectors.pdfDownloadContainer, "hidden", true);
+  currentBattlecard = null;
+  
   try {
     const response = await fetch(`${BACKEND_BASE_URL}/analyze`, {
       method: "POST",
@@ -645,7 +775,7 @@ const handleSubmit = async (event) => {
     }
 
     const data = await response.json();
-    renderBattlecards(data);
+    renderBattlecards(data, inputValue);
   } catch (error) {
     console.error(error);
     const msg =
@@ -705,6 +835,20 @@ if (selectors.urlInput) {
 
 if (selectors.form) {
   selectors.form.addEventListener("submit", handleSubmit);
+}
+
+// Initialize saved battlecards UI on page load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    updateSavedBattlecardsUI();
+  });
+} else {
+  updateSavedBattlecardsUI();
+}
+
+// Set up PDF download button
+if (selectors.downloadPdfBtn) {
+  selectors.downloadPdfBtn.addEventListener("click", handlePdfDownload);
 }
 
 window.renderBattlecards = renderBattlecards;
