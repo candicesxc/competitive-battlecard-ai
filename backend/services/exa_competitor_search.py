@@ -108,7 +108,8 @@ async def find_competitor_candidates_with_exa(
     # Step 1: Use Exa "find_similar" search
     try:
         logger.info("Using Exa find_similar for %s", target_url)
-        similar_results = await exa.find_similar_and_contents(
+        similar_results = await asyncio.to_thread(
+            exa.find_similar_and_contents,
             target_url,
             num_results=10,
             use_autoprompt=True,
@@ -166,9 +167,10 @@ async def find_competitor_candidates_with_exa(
     # Step 3: Execute keyword searches
     search_tasks = []
     for query in queries[:4]:  # Limit to 4 queries to control costs
-        # Create coroutine for each query
+        # Create coroutine for each query - wrap sync call in asyncio.to_thread
         search_tasks.append(
-            exa.search_and_contents(
+            asyncio.to_thread(
+                exa.search_and_contents,
                 query,
                 num_results=5,
                 text={"max_characters": 2000},
