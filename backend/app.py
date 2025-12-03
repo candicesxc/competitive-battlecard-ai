@@ -22,6 +22,8 @@ app.add_middleware(
     allow_origins=[
         "https://candicesxc.github.io",
         "https://candicesxc.github.io/competitive-battlecard-ai",
+        "https://candiceshen.com",
+        "https://candiceshen.com/competitive-battlecard-ai",
     ],
     allow_credentials=True,
     allow_methods=["*"],
