@@ -43,15 +43,21 @@
             Company website
           </label>
           <div class="mt-2 flex flex-col gap-3 sm:flex-row">
-            <input
-              id="company-url"
-              name="company_url"
-              type="url"
-              placeholder="https://example.com"
-              class="flex-1 rounded-xl border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              autocomplete="url"
-              required
-            />
+            <div class="flex-1 relative">
+              <input
+                id="company-url"
+                name="company_url"
+                type="text"
+                placeholder="https://example.com"
+                class="w-full rounded-xl border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                autocomplete="url"
+                required
+              />
+              <div id="domain-suggestion" class="hidden absolute top-full left-0 mt-1 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-indigo-700">
+                <span>Did you mean: </span>
+                <button type="button" id="suggestion-button" class="font-semibold underline hover:text-indigo-900"></button>
+              </div>
+            </div>
             <button
               id="submit-btn"
               type="submit"
@@ -85,7 +91,6 @@
         <div class="mx-auto w-full max-w-xl space-y-2">
           <div class="flex items-center justify-between text-xs font-medium text-indigo-700">
             <span id="progress-message">Analyzing company website…</span>
-            <span id="progress-value">0%</span>
           </div>
           <div class="progress-track">
             <div id="progress-fill" class="progress-fill"></div>
