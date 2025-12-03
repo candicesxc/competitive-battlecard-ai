@@ -69,7 +69,7 @@ body {
 }
 
 .section-title {
-  font-size: 0.875rem;
+  font-size: 1.125rem;
   letter-spacing: 0.1em;
   font-weight: 600;
   text-transform: uppercase;
@@ -217,6 +217,12 @@ ul li {
   border: none;
   outline: none;
   white-space: nowrap;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.875rem 1.5rem;
+  min-height: 3rem;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
 }
 
 .competitor-tab:focus-visible {
@@ -225,7 +231,10 @@ ul li {
 }
 
 .competitor-tab:hover:not([aria-selected="true"]) {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  background-color: #cbd5e1 !important;
+  color: #1e293b !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .competitor-card {

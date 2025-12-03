@@ -344,10 +344,7 @@ const createPricingSection = (title, items, accentClass) => {
     return section;
   }
 
-  // Create a column layout for pricing (2 columns)
-  const columnsContainer = document.createElement("div");
-  columnsContainer.className = "grid grid-cols-1 md:grid-cols-2 gap-4";
-
+  // Create a single column layout for pricing (full width)
   const list = document.createElement("ul");
   list.className = "space-y-2.5 text-sm leading-relaxed text-slate-700 list-none";
 
@@ -358,8 +355,7 @@ const createPricingSection = (title, items, accentClass) => {
     list.appendChild(li);
   });
 
-  columnsContainer.appendChild(list);
-  section.appendChild(columnsContainer);
+  section.appendChild(list);
   return section;
 };
 
@@ -410,7 +406,6 @@ const createTargetCard = (target, marketSummary) => {
   grid.append(
     createSection("Company overview", [target.overview].filter(Boolean), "text-blue-600"),
     createSection("Products", target.products, "text-blue-600"),
-    createSection("Pricing", target.pricing, "text-blue-600"),
   );
 
   const strengthsWeaknesses = document.createElement("div");
@@ -420,7 +415,10 @@ const createTargetCard = (target, marketSummary) => {
     createSection("Weaknesses", target.weaknesses, "text-slate-500"),
   );
 
-  section.append(grid, strengthsWeaknesses);
+  // Add pricing section at the end with full width (2 columns)
+  const pricingSection = createPricingSection("Pricing", target.pricing, "text-blue-600");
+  
+  section.append(grid, strengthsWeaknesses, pricingSection);
   return section;
 };
 
@@ -438,7 +436,7 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
 
   const info = document.createElement("div");
   const title = document.createElement("h3");
-  title.className = "text-2xl font-bold text-slate-900 mb-2";
+  title.className = "text-3xl font-bold text-slate-900 mb-2";
   title.textContent = competitor.company_name || "Competitor";
   
   // Add website URL directly under the competitor name
@@ -525,10 +523,10 @@ const createCompetitorGrid = (competitors) => {
   competitors.forEach((competitor, index) => {
     const tab = document.createElement("button");
     tab.type = "button";
-    tab.className = `competitor-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+    tab.className = `competitor-tab transition-all duration-200 ${
       index === 0 
-        ? "bg-indigo-600 text-white shadow-md" 
-        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+        ? "bg-indigo-600 text-white shadow-lg" 
+        : "bg-slate-200 text-slate-800"
     }`;
     tab.textContent = competitor.company_name || `Competitor ${index + 1}`;
     tab.dataset.competitorIndex = index;
@@ -539,12 +537,12 @@ const createCompetitorGrid = (competitors) => {
       // Update tab states
       tabsList.querySelectorAll(".competitor-tab").forEach((t, i) => {
         if (i === index) {
-          t.classList.remove("bg-slate-100", "text-slate-700");
-          t.classList.add("bg-indigo-600", "text-white", "shadow-md");
+          t.classList.remove("bg-slate-200", "text-slate-800");
+          t.classList.add("bg-indigo-600", "text-white", "shadow-lg");
           t.setAttribute("aria-selected", "true");
         } else {
-          t.classList.remove("bg-indigo-600", "text-white", "shadow-md");
-          t.classList.add("bg-slate-100", "text-slate-700");
+          t.classList.remove("bg-indigo-600", "text-white", "shadow-lg");
+          t.classList.add("bg-slate-200", "text-slate-800");
           t.setAttribute("aria-selected", "false");
         }
       });
