@@ -116,13 +116,25 @@ const toggleClass = (element, className, shouldAdd) => {
 let isLoading = false;
 let progress = 0;
 let progressTimer = null;
+let startTime = null;
+let elapsedTime = 0;
 
-const getProgressMessage = (value) => {
-  if (value < 30) return "Analyzing company website…";
-  if (value < 60) return "Searching for relevant competitors…";
-  if (value < 90) return "Scoring and ranking competitors…";
-  if (value < 100) return "Generating final battlecard…";
-  return "Generating final battlecard…";
+const getProgressMessage = (value, elapsedSeconds) => {
+  const estimatedTotal = 120; // Estimated total time in seconds (2 minutes)
+  const remaining = Math.max(0, estimatedTotal - elapsedSeconds);
+  const remainingMinutes = Math.floor(remaining / 60);
+  const remainingSeconds = Math.floor(remaining % 60);
+  const timeEstimate = remaining > 30 
+    ? ` (~${remainingMinutes}m ${remainingSeconds}s remaining)`
+    : remaining > 0
+    ? ` (~${remainingSeconds}s remaining)`
+    : "";
+  
+  if (value < 25) return `Analyzing company website…${timeEstimate}`;
+  if (value < 50) return `Searching for relevant competitors…${timeEstimate}`;
+  if (value < 75) return `Scoring and ranking competitors…${timeEstimate}`;
+  if (value < 95) return `Generating final battlecard…${timeEstimate}`;
+  return `Finalizing your battlecard…${timeEstimate}`;
 };
 
 const updateProgressUI = () => {
@@ -133,7 +145,8 @@ const updateProgressUI = () => {
     selectors.progressValue.textContent = `${Math.round(progress)}%`;
   }
   if (selectors.progressMessage) {
-    selectors.progressMessage.textContent = getProgressMessage(progress);
+    const elapsed = startTime ? (Date.now() - startTime) / 1000 : 0;
+    selectors.progressMessage.textContent = getProgressMessage(progress, elapsed);
   }
 };
 
@@ -151,25 +164,40 @@ const stopProgressTimer = () => {
 
 const startProgressTimer = () => {
   stopProgressTimer();
+  startTime = Date.now();
   progressTimer = window.setInterval(() => {
     if (!isLoading) {
       stopProgressTimer();
       return;
     }
-    if (progress >= 95) {
-      return;
-    }
-    let increment = 0.5;
-    if (progress < 30) {
-      increment = 3;
+    
+    const elapsed = (Date.now() - startTime) / 1000;
+    let increment = 0.3;
+    
+    // More realistic progress based on elapsed time
+    // Early stages move faster
+    if (progress < 20) {
+      increment = 2.5;
+    } else if (progress < 40) {
+      increment = 1.8;
     } else if (progress < 60) {
-      increment = 2;
+      increment = 1.2;
     } else if (progress < 80) {
-      increment = 1.5;
+      increment = 0.8;
+    } else if (progress < 92) {
+      increment = 0.4;
+    } else if (progress < 97) {
+      // Slow down significantly but still progress
+      increment = 0.15;
     } else {
-      increment = 0.75;
+      // Very slow near completion, but don't stop
+      increment = 0.05;
     }
-    setProgress(Math.min(progress + increment, 95));
+    
+    // Don't let it get stuck - always allow some progress
+    // Cap at 98% until actual completion
+    const maxProgress = elapsed > 90 ? 98 : 97;
+    setProgress(Math.min(progress + increment, maxProgress));
   }, 500);
 };
 
@@ -177,6 +205,7 @@ const setLoading = (loading) => {
   if (loading) {
     if (isLoading) return;
     isLoading = true;
+    startTime = Date.now();
     toggleClass(selectors.loadingState, "hidden", false);
     if (selectors.submitBtn) {
       selectors.submitBtn.disabled = true;
@@ -190,6 +219,7 @@ const setLoading = (loading) => {
 
   setProgress(100);
   stopProgressTimer();
+  startTime = null;
 
   window.setTimeout(() => {
     isLoading = false;
@@ -277,15 +307,15 @@ const createTargetCard = (target, marketSummary) => {
   if (marketSummary) {
     const summary = document.createElement("div");
     summary.className =
-      "rounded-2xl border border-indigo-200/60 bg-white/90 backdrop-blur-sm p-6 lg:p-8 shadow-lg";
+      "market-snapshot-section rounded-2xl border-2 border-blue-300/60 bg-gradient-to-br from-blue-50/90 via-cyan-50/80 to-sky-50/90 backdrop-blur-sm p-6 lg:p-8 shadow-lg mb-8";
     const heading = document.createElement("h2");
-    heading.className = "text-xl font-semibold text-indigo-700 mb-3";
+    heading.className = "text-2xl font-semibold text-blue-800 mb-4";
     heading.textContent = "Market snapshot";
     const body = document.createElement("p");
-    body.className = "mt-2 text-base leading-7 text-slate-700";
+    body.className = "mt-2 text-base leading-7 text-slate-800 font-medium";
     body.textContent = marketSummary;
     summary.append(heading, body);
-    section.appendChild(summary);
+    section.insertBefore(summary, section.firstChild);
   }
 
   const header = document.createElement("header");
@@ -349,7 +379,7 @@ const createCompetitorCard = (competitor) => {
     websiteLink.href = website;
     websiteLink.target = "_blank";
     websiteLink.rel = "noopener noreferrer";
-    websiteLink.className = "text-sm text-indigo-600 hover:text-indigo-700 mt-1 mb-3 block break-all transition-colors duration-200 font-medium";
+    websiteLink.className = "text-sm text-slate-600 hover:text-slate-800 mt-1 mb-3 block break-all transition-colors duration-200 font-medium";
     websiteLink.textContent = website;
   }
   
@@ -388,16 +418,20 @@ const createCompetitorGrid = (competitors) => {
   const section = document.createElement("section");
   section.className = "space-y-8";
 
+  const headerWrapper = document.createElement("div");
+  headerWrapper.className = "competitive-landscape-header";
+  
   const heading = document.createElement("h2");
-  heading.className = "text-3xl font-bold text-slate-900 mb-2";
+  heading.className = "competitive-landscape-title";
   heading.textContent = "Competitive landscape";
   
   const subheading = document.createElement("p");
-  subheading.className = "text-base text-slate-600 mb-6";
+  subheading.className = "competitive-landscape-subtitle";
   subheading.textContent = "Detailed analysis of your competitive landscape";
 
-  section.appendChild(heading);
-  section.appendChild(subheading);
+  headerWrapper.appendChild(heading);
+  headerWrapper.appendChild(subheading);
+  section.appendChild(headerWrapper);
 
   if (!competitors || competitors.length === 0) {
     const empty = document.createElement("p");
