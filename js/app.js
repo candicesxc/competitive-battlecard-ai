@@ -392,7 +392,7 @@ const createTargetCard = (target, marketSummary) => {
 
   // Company header
   const header = document.createElement("header");
-  header.className = "flex flex-col gap-6 md:flex-row md:items-center md:justify-between pb-6 mb-4";
+  header.className = "flex flex-col gap-6 md:flex-row md:items-center md:justify-between pb-2 mb-2";
 
   const companyInfo = document.createElement("div");
   companyInfo.className = "flex flex-col gap-2";
@@ -412,7 +412,7 @@ const createTargetCard = (target, marketSummary) => {
   section.appendChild(header);
 
   const grid = document.createElement("div");
-  grid.className = "card-grid -mt-4";
+  grid.className = "card-grid -mt-2";
   grid.append(
     createSection("Company overview", [target.overview].filter(Boolean), "text-blue-600"),
     createSection("Products", target.products, "text-blue-600"),
