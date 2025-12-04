@@ -300,15 +300,14 @@ const suggestDomainCompletion = (value) => {
   return null;
 };
 
-// Simplified section creation - removed heavy borders and boxes
-// Uses whitespace and spacing instead of containers with borders
+// Section creation with boxes around sections
 const createSection = (title, items, accentClass) => {
   const section = document.createElement("div");
-  // Removed border, rounded corners, background, and shadow for cleaner look
-  section.className = "py-4";
+  section.className =
+    "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md transition-all duration-200 hover:shadow-lg";
 
   const heading = document.createElement("h3");
-  heading.className = `section-title mb-4 ${accentClass}`;
+  heading.className = `section-title mb-3 ${accentClass}`;
   heading.textContent = title;
   section.appendChild(heading);
 
@@ -321,8 +320,7 @@ const createSection = (title, items, accentClass) => {
   }
 
   const list = document.createElement("ul");
-  // Increased spacing and removed list styling for cleaner appearance
-  list.className = "space-y-3 text-base leading-relaxed text-slate-700 list-none";
+  list.className = "space-y-2.5 text-sm leading-relaxed text-slate-700 list-none";
 
   items.forEach((item) => {
     const li = document.createElement("li");
@@ -335,14 +333,14 @@ const createSection = (title, items, accentClass) => {
   return section;
 };
 
-// Simplified pricing section - removed heavy borders and boxes
+// Pricing section with boxes around sections
 const createPricingSection = (title, items, accentClass) => {
   const section = document.createElement("div");
-  // Removed border, rounded corners, background, and shadow for cleaner look
-  section.className = "py-4 col-span-full";
+  section.className =
+    "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md transition-all duration-200 hover:shadow-lg col-span-full";
 
   const heading = document.createElement("h3");
-  heading.className = `section-title mb-4 ${accentClass}`;
+  heading.className = `section-title mb-3 ${accentClass}`;
   heading.textContent = title;
   section.appendChild(heading);
 
@@ -356,8 +354,7 @@ const createPricingSection = (title, items, accentClass) => {
 
   // Create a single column layout for pricing (full width)
   const list = document.createElement("ul");
-  // Increased spacing for better readability
-  list.className = "space-y-3 text-base leading-relaxed text-slate-700 list-none";
+  list.className = "space-y-2.5 text-sm leading-relaxed text-slate-700 list-none";
 
   items.forEach((item) => {
     const li = document.createElement("li");
@@ -393,9 +390,9 @@ const createTargetCard = (target, marketSummary) => {
     section.appendChild(marketSection);
   }
 
-  // Company header - simplified, no border
+  // Company header
   const header = document.createElement("header");
-  header.className = "flex flex-col gap-6 md:flex-row md:items-center md:justify-between pb-6";
+  header.className = "flex flex-col gap-6 md:flex-row md:items-center md:justify-between pb-6 mb-4";
 
   const companyInfo = document.createElement("div");
   companyInfo.className = "flex flex-col gap-2";
@@ -415,7 +412,7 @@ const createTargetCard = (target, marketSummary) => {
   section.appendChild(header);
 
   const grid = document.createElement("div");
-  grid.className = "card-grid";
+  grid.className = "card-grid -mt-4";
   grid.append(
     createSection("Company overview", [target.overview].filter(Boolean), "text-blue-600"),
     createSection("Products", target.products, "text-blue-600"),
@@ -435,19 +432,18 @@ const createTargetCard = (target, marketSummary) => {
   return section;
 };
 
-// Simplified competitor card - removed heavy borders and boxes
+// Competitor card with boxes around sections
 const createCompetitorCard = (competitor, index, isActive = false) => {
   const article = document.createElement("article");
-  // Removed border, rounded corners, background, and shadow for cleaner look
-  article.className = `competitor-card group py-6`;
+  article.className =
+    `competitor-card group rounded-3xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-8 lg:p-10 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-slate-300/80`;
   article.dataset.competitorIndex = index;
   if (!isActive) {
     article.classList.add("hidden");
   }
 
   const header = document.createElement("header");
-  // Removed border for cleaner look
-  header.className = "mb-8 pb-6";
+  header.className = "mb-6 pb-6 border-b border-slate-200/60";
 
   const info = document.createElement("div");
   const title = document.createElement("h3");
@@ -478,7 +474,7 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
   header.append(info);
 
   const grid = document.createElement("div");
-  grid.className = "card-grid";
+  grid.className = "card-grid -mt-4";
   grid.append(
     createSection("Company overview", [competitor.overview].filter(Boolean), "text-blue-600"),
     createSection("Products", competitor.products, "text-blue-600"),
