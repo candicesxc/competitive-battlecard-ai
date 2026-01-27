@@ -89,7 +89,10 @@ class BattlecardCrew:
         if not overview.get("name"):
             raise RuntimeError("Unable to find company info for this URL.")
 
-        website = overview.get("website") or target_url
+        if search_service.extract_domain(target_url):
+            website = target_url
+        else:
+            website = overview.get("website") or target_url
         target_page_text = await competitor_pipeline.fetch_page_text(website)
 
         target_profile: Dict[str, Any] = {}

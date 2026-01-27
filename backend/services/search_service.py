@@ -14,6 +14,26 @@ class SearchProviderError(RuntimeError):
     """Custom exception raised when external search API calls fail."""
 
 
+_SKIP_DOMAINS = {
+    "linkedin.com",
+    "facebook.com",
+    "twitter.com",
+    "x.com",
+    "instagram.com",
+    "crunchbase.com",
+    "wikipedia.org",
+    "g2.com",
+    "capterra.com",
+    "glassdoor.com",
+    "indeed.com",
+    "youtube.com",
+    "pinterest.com",
+    "reddit.com",
+    "medium.com",
+    "zoominfo.com",
+}
+
+
 def extract_domain(url: str) -> Optional[str]:
     try:
         parsed = urlparse(url)
@@ -22,6 +42,18 @@ def extract_domain(url: str) -> Optional[str]:
     except ValueError:
         logger.debug("Failed to parse URL for domain extraction: %s", url)
     return None
+
+
+def _is_social_or_directory(url: Optional[str]) -> bool:
+    if not url:
+        return True
+    domain = extract_domain(url)
+    if not domain:
+        return True
+    domain = domain.lower()
+    # Check if the domain ends with or contains any of the skipped domains
+    # We check containment to handle subdomains like www.linkedin.com
+    return any(skip in domain for skip in _SKIP_DOMAINS)
 
 
 async def _exa_search_request(query: str, num_results: int = 10) -> Dict[str, Any]:
@@ -206,13 +238,24 @@ def parse_company_overview(search_results: Dict[str, Any]) -> Dict[str, Any]:
         "organic_results", []
     )
 
+    # Find the first result that is not a social/directory link
+    best_result = None
+    for result in organic:
+        if not _is_social_or_directory(result.get("link")):
+            best_result = result
+            break
+    
+    # Fallback to first result if all are skipped or list is empty
+    if not best_result and organic:
+        best_result = organic[0]
+
     overview = {
         "name": knowledge_graph.get("title")
-        or (organic[0].get("title") if organic else None),
+        or (best_result.get("title") if best_result else None),
         "description": knowledge_graph.get("description")
-        or (organic[0].get("snippet") if organic else None),
+        or (best_result.get("snippet") if best_result else None),
         "website": knowledge_graph.get("website")
-        or (organic[0].get("link") if organic else None),
+        or (best_result.get("link") if best_result else None),
         "profiles": knowledge_graph.get("profiles", []),
         "related": knowledge_graph.get("peopleAlsoSearchFor", []),
     }
