@@ -245,3 +245,11 @@ ul li {
   display: none;
 }
 
+/* Details/summary chevron rotation for news section */
+details[open] .details-chevron {
+  transform: rotate(180deg);
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
