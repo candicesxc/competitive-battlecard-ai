@@ -61,28 +61,30 @@ async def _collect_search_snippets_for_company(
     industry = profile.get("industry", "")
     target_audience = profile.get("target_audience", "")
 
-    # Build search queries
+    # Build search queries — 3 high-signal queries instead of 6.
+    # "{name} competitors" and "{name} alternatives" surface different landing pages
+    # and cover most of what the redundant "{name} similar platforms" found.
+    # One audience-specific industry query replaces three overlapping industry queries.
     queries: List[str] = []
     if name:
         queries.append(f"{name} competitors")
         queries.append(f"{name} alternatives")
-        queries.append(f"{name} similar platforms")
 
     if industry:
-        queries.append(f"top {industry} tools")
-        queries.append(f"best {industry} platforms")
         if target_audience:
             queries.append(f"best {industry} tools for {target_audience}")
+        else:
+            queries.append(f"top {industry} tools")
 
     # Execute searches sequentially to respect rate limiting
     # The rate limiter will ensure proper spacing between calls
     search_results_list = []
-    for query in queries[:6]:  # Limit to 6 queries
+    for query in queries[:3]:  # Limit to 3 queries
         try:
             result = await cached_search_and_contents(
                 query,
                 num_results=8,
-                text={"max_characters": 2000},
+                text={"max_characters": 400},  # Only need enough to identify competitor names
             )
             search_results_list.append(result)
         except Exception as exc:
@@ -90,7 +92,7 @@ async def _collect_search_snippets_for_company(
             search_results_list.append(exc)
 
     try:
-        for query, results in zip(queries[:6], search_results_list):
+        for query, results in zip(queries[:3], search_results_list):
             if isinstance(results, Exception):
                 logger.warning("Exa search failed for '%s': %s", query, results)
                 continue
@@ -108,7 +110,7 @@ async def _collect_search_snippets_for_company(
                         "query": query,
                         "source_url": url,
                         "source_title": title,
-                        "excerpt_text": text[:1500],  # Keep excerpts reasonable
+                        "excerpt_text": text[:400],  # Match the reduced fetch size
                     }
                 )
     except Exception as exc:
@@ -303,12 +305,16 @@ async def discover_competitors_via_search(
         logger.warning("No competitor stubs extracted from snippets")
         return []
 
-    # Step 3: Resolve missing websites
-    for stub in stubs:
+    # Step 3: Resolve missing websites — fire all resolution tasks concurrently.
+    # The Exa rate-limit lock serializes the actual HTTP calls, but this eliminates
+    # the per-stub Python await overhead and lets cache hits complete instantly.
+    async def _resolve_and_assign(stub: CompetitorStub) -> None:
         if not stub.get("website"):
             website = await _resolve_official_website(stub["name"])
             if website:
                 stub["website"] = website
+
+    await asyncio.gather(*[_resolve_and_assign(stub) for stub in stubs])
 
     # Step 4: Deduplicate and filter
     seen_names: set[str] = set()

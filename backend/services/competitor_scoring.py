@@ -98,7 +98,9 @@ async def score_competitors(
         if website:
             try:
                 page_text = await fetch_page_text(website)
-                text_excerpt = page_text[:2000] if page_text else ""
+                # 500 chars is sufficient for scoring — model already has name, website,
+                # and description. Cuts the scoring prompt from ~22k to ~7k tokens.
+                text_excerpt = page_text[:500] if page_text else ""
             except Exception as exc:
                 logger.debug("Failed to fetch page text for %s: %s", website, exc)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict
 
@@ -46,7 +47,13 @@ async def analyze_company(payload: AnalyzeRequest) -> JSONResponse:
     logger.info("Received analyze request for %s", payload.company_url)
 
     try:
-        result = await battlecard_crew.run(str(payload.company_url))
+        async with asyncio.timeout(120):  # 2-minute hard cap; prevents hung Exa/OpenAI calls
+            result = await battlecard_crew.run(str(payload.company_url))
+    except asyncio.TimeoutError:
+        logger.error("Pipeline timed out for %s", payload.company_url)
+        raise HTTPException(
+            status_code=504, detail="Analysis timed out. Please try again."
+        ) from None
     except SearchProviderError as exc:
         logger.error("Search provider error: %s", exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc

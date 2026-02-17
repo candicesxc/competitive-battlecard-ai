@@ -305,16 +305,7 @@ class BattlecardCrew:
         if not target_name:
             raise RuntimeError("Unable to determine the target company name.")
 
-        target_company = await self._collect_company_research(
-            target_name,
-            target_website,
-            metadata={"pipeline_profile": target_profile},
-        )
-        target_company.raw_context.setdefault("pipeline_profile", target_profile)
-        target_company.raw_context.setdefault(
-            "search_payload", research.get("target_search_payload")
-        )
-
+        # Build competitor tasks first so we can merge with target into one gather
         competitor_tasks = []
         competitor_metadata: List[Dict[str, Any]] = []
         for comp in research.get("competitors", []):
@@ -329,22 +320,43 @@ class BattlecardCrew:
             )
             competitor_metadata.append(comp)
 
+        # Gather target enrichment and all competitor enrichments concurrently.
+        # Target is first; competitors follow. All are independent — no ordering dependency.
+        all_results = await asyncio.gather(
+            self._collect_company_research(
+                target_name,
+                target_website,
+                metadata={"pipeline_profile": target_profile},
+            ),
+            *competitor_tasks,
+            return_exceptions=True,
+        )
+
+        # First result is the target
+        target_result = all_results[0]
+        if isinstance(target_result, Exception):
+            raise RuntimeError(
+                f"Failed to collect target company research: {target_result}"
+            ) from target_result
+        target_company: CompanyResearch = target_result
+        target_company.raw_context.setdefault("pipeline_profile", target_profile)
+        target_company.raw_context.setdefault(
+            "search_payload", research.get("target_search_payload")
+        )
+
+        # Remaining results are competitors
         competitors_data: List[CompanyResearch] = []
-        if competitor_tasks:
-            results = await asyncio.gather(
-                *competitor_tasks, return_exceptions=True
-            )
-            for meta, result in zip(competitor_metadata, results):
-                if isinstance(result, Exception):
-                    logger.warning(
-                        "Failed to collect research for competitor %s: %s",
-                        meta.get("name"),
-                        result,
-                    )
-                    continue
-                result.metadata.update(meta or {})
-                result.raw_context.setdefault("pipeline_candidate", meta)
-                competitors_data.append(result)
+        for meta, result in zip(competitor_metadata, all_results[1:]):
+            if isinstance(result, Exception):
+                logger.warning(
+                    "Failed to collect research for competitor %s: %s",
+                    meta.get("name"),
+                    result,
+                )
+                continue
+            result.metadata.update(meta or {})
+            result.raw_context.setdefault("pipeline_candidate", meta)
+            competitors_data.append(result)
 
         return {
             "target": target_company,
@@ -357,15 +369,35 @@ class BattlecardCrew:
         logger.info("AnalystAgent: generating profiles and SWOT insights")
 
         target_company = enriched["target"]
-        # Generate profile and strengths in parallel
-        target_profile, target_strengths = await asyncio.gather(
+
+        # Merge target and competitor analysis into one gather.
+        # _analyze_competitor has no dependency on the target's profile/strengths —
+        # it only uses its own CompanyResearch input — so all tasks are independent.
+        competitor_tasks = [
+            self._analyze_competitor(company) for company in enriched["competitors"]
+        ]
+        all_results = await asyncio.gather(
             analysis_service.generate_company_profile(
                 target_company.company_name, target_company.raw_context
             ),
             analysis_service.generate_strengths_weaknesses(
                 target_company.company_name, target_company.raw_context
             ),
+            *competitor_tasks,
+            return_exceptions=True,
         )
+
+        # Unpack: index 0 = target profile, 1 = target strengths, 2+ = competitors
+        target_profile_result = all_results[0]
+        target_strengths_result = all_results[1]
+        if isinstance(target_profile_result, Exception):
+            logger.warning("Target profile generation failed: %s", target_profile_result)
+            target_profile_result = {}
+        if isinstance(target_strengths_result, Exception):
+            logger.warning("Target strengths generation failed: %s", target_strengths_result)
+            target_strengths_result = {}
+        target_profile = target_profile_result
+        target_strengths = target_strengths_result
 
         target_payload = {
             **target_profile,
@@ -405,13 +437,7 @@ class BattlecardCrew:
         target_payload.setdefault("score_vs_target", 10)
 
         competitor_results: List[Dict[str, Any]] = []
-        competitor_tasks = [
-            self._analyze_competitor(company) for company in enriched["competitors"]
-        ]
-
-        for competitor in await asyncio.gather(
-            *competitor_tasks, return_exceptions=True
-        ):
+        for competitor in all_results[2:]:
             if isinstance(competitor, Exception):
                 logger.warning("Competitor analysis failed: %s", competitor)
                 continue
