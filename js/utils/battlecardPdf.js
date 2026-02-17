@@ -134,23 +134,112 @@ function generateBattlecardPdf(battlecard) {
 
   yPosition += sectionSpacing; // Extra space before content
 
+  // Helper to render a section body (bullets or paragraph)
+  const renderSectionBody = (bodyText) => {
+    const hasBullets = bodyText.includes("•") || bodyText.includes("- ") || bodyText.includes("* ");
+    if (hasBullets) {
+      const lines = bodyText.split(/\n/).filter(line => line.trim());
+      lines.forEach((line) => {
+        const trimmedLine = line.trim();
+        if (trimmedLine) {
+          const cleanLine = trimmedLine.replace(/^[•\-\*]\s*/, "");
+          doc.setFontSize(bodySize);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(colors.slate700[0], colors.slate700[1], colors.slate700[2]);
+          const bulletLines = splitText(`• ${cleanLine}`, bodySize, maxWidth - 5);
+          bulletLines.forEach((bulletLine, idx) => {
+            if (yPosition + lineHeight > pageHeight - margin) {
+              doc.addPage();
+              yPosition = margin;
+            }
+            const xPos = idx === 0 ? margin : margin + 5;
+            doc.text(bulletLine, xPos, yPosition);
+            yPosition += lineHeight * 1.2;
+          });
+        }
+      });
+    } else {
+      addText(bodyText, bodySize, false, colors.slate700, lineHeight * 1.3);
+    }
+  };
+
+  // Track competitor sections to add page breaks + name headers
+  let lastCompetitorIndex = null;
+
   // Process all sections
   battlecard.sections.forEach((section, index) => {
     if (!section.body || !section.body.trim()) return;
 
+    // Detect start of a new competitor block
+    const competitorHeaderMatch = section.id && section.id.match(/^competitor_(\d+)_header$/);
+    const competitorOverviewMatch = section.id && section.id.match(/^competitor_(\d+)_overview$/);
+    const isNewCompetitor = competitorHeaderMatch || (competitorOverviewMatch && lastCompetitorIndex !== competitorOverviewMatch[1]);
+
+    if (isNewCompetitor) {
+      const compIndex = (competitorHeaderMatch || competitorOverviewMatch)[1];
+      if (lastCompetitorIndex !== compIndex) {
+        lastCompetitorIndex = compIndex;
+
+        // Page break before each competitor
+        doc.addPage();
+        yPosition = margin;
+
+        // Extract competitor name from title
+        const competitorName = section.title.replace(/^Competitor:\s*/i, "").replace(/ - Company overview$/i, "");
+
+        // Bold separator line
+        doc.setDrawColor(colors.indigo600[0], colors.indigo600[1], colors.indigo600[2]);
+        doc.setLineWidth(0.8);
+        doc.line(margin, yPosition, pageWidth - margin, yPosition);
+        yPosition += 8;
+
+        // Large competitor name header
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(colors.slate900[0], colors.slate900[1], colors.slate900[2]);
+        doc.text(competitorName, margin, yPosition);
+        yPosition += 8;
+
+        // "Competitor Analysis" label
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(colors.indigo600[0], colors.indigo600[1], colors.indigo600[2]);
+        doc.text("COMPETITOR ANALYSIS", margin, yPosition);
+        yPosition += sectionSpacing;
+
+        // If this was the header section (with website), render the website inline and skip normal rendering
+        if (competitorHeaderMatch) {
+          if (section.body && section.body.startsWith("Website:")) {
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(colors.slate600[0], colors.slate600[1], colors.slate600[2]);
+            doc.text(section.body, margin, yPosition - sectionSpacing + 2);
+          }
+          return; // Skip normal section rendering for header
+        }
+      }
+    }
+
     checkPageBreak(35);
 
     // Add spacing before section (except first one)
-    if (index > 0) {
+    if (index > 0 && !isNewCompetitor) {
       yPosition += sectionSpacing;
+    }
+
+    // Clean section title: strip "CompanyName - " prefix for competitor sub-sections
+    let displayTitle = section.title;
+    const competitorPrefixMatch = displayTitle.match(/^.+ - (.+)$/);
+    if (competitorPrefixMatch && section.id && section.id.startsWith("competitor_")) {
+      displayTitle = competitorPrefixMatch[1];
     }
 
     // Section title - bold and larger
     doc.setFontSize(sectionTitleSize);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(colors.slate900[0], colors.slate900[1], colors.slate900[2]);
-    
-    const titleLines = splitText(section.title, sectionTitleSize, maxWidth);
+
+    const titleLines = splitText(displayTitle, sectionTitleSize, maxWidth);
     titleLines.forEach((line) => {
       if (yPosition + lineHeight > pageHeight - margin) {
         doc.addPage();
@@ -159,45 +248,12 @@ function generateBattlecardPdf(battlecard) {
       doc.text(line, margin, yPosition);
       yPosition += lineHeight;
     });
-    
+
     // Add subtle accent line under section title
     addAccentLine();
-    yPosition += 5; // Space after accent line
+    yPosition += 5;
 
-    // Section body - regular weight, readable size
-    let bodyText = section.body;
-    const hasBullets = bodyText.includes("•") || bodyText.includes("- ") || bodyText.includes("* ");
-    
-    if (hasBullets) {
-      // Split by bullet points and format each with indentation
-      const lines = bodyText.split(/\n/).filter(line => line.trim());
-      lines.forEach((line) => {
-        const trimmedLine = line.trim();
-        if (trimmedLine) {
-          // Clean bullet symbols and add indentation
-          const cleanLine = trimmedLine.replace(/^[•\-\*]\s*/, "");
-          // Add text with slight indentation for bullets
-          doc.setFontSize(bodySize);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(colors.slate700[0], colors.slate700[1], colors.slate700[2]);
-          
-          const bulletLines = splitText(`• ${cleanLine}`, bodySize, maxWidth - 5);
-          bulletLines.forEach((bulletLine, idx) => {
-            if (yPosition + lineHeight > pageHeight - margin) {
-              doc.addPage();
-              yPosition = margin;
-            }
-            // First line has bullet, subsequent lines are indented
-            const xPos = idx === 0 ? margin : margin + 5;
-            doc.text(bulletLine, xPos, yPosition);
-            yPosition += lineHeight * 1.2; // Slightly more spacing for bullet lists
-          });
-        }
-      });
-    } else {
-      // Regular paragraph text with proper line spacing
-      addText(bodyText, bodySize, false, colors.slate700, lineHeight * 1.3);
-    }
+    renderSectionBody(section.body);
   });
 
   // Add page numbers - subtle and in footer
