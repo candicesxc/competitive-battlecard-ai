@@ -369,6 +369,23 @@ const createPricingSection = (title, items, accentClass) => {
 
 // createScoreBar function removed - competitive score no longer displayed in UI
 
+// Filter out irrelevant news (listicles, comparison articles, etc.)
+const isRelevantNews = (newsItem) => {
+  if (!newsItem || !newsItem.title) return false;
+  const title = (newsItem.title + " " + (newsItem.snippet || "")).toLowerCase();
+  const irrelevantKeywords = [
+    "alternatives",
+    "competitors",
+    "best X for",
+    " vs ",
+    "compared to",
+    "instead of",
+    "replace",
+    "switch from",
+  ];
+  return !irrelevantKeywords.some((keyword) => title.includes(keyword));
+};
+
 // Section with copy-to-clipboard button (used for Key Differentiators and Potential Landmines)
 const createCopyableSection = (title, items, accentClass) => {
   const section = document.createElement("div");
@@ -562,20 +579,49 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
     typeBadge.textContent = competitorType.charAt(0).toUpperCase() + competitorType.slice(1) + " competitor";
     typeRow.appendChild(typeBadge);
 
-    const reason = competitor.reason_for_similarity || competitor.why_similar || "";
-    if (reason) {
-      const reasonIcon = document.createElement("button");
-      reasonIcon.type = "button";
-      reasonIcon.className = "text-slate-400 hover:text-slate-600 transition-colors relative group";
-      reasonIcon.setAttribute("aria-label", "Why this competitor?");
-      reasonIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>`;
+    const reasonIcon = document.createElement("button");
+    reasonIcon.type = "button";
+    reasonIcon.className = "text-slate-400 hover:text-slate-600 transition-colors relative group";
+    reasonIcon.setAttribute("aria-label", "Why this competitor?");
+    reasonIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>`;
 
-      const tooltip = document.createElement("span");
-      tooltip.className = "absolute left-6 top-0 z-10 w-64 rounded-xl bg-slate-900 text-white text-xs leading-relaxed px-3 py-2.5 shadow-xl hidden group-hover:block";
-      tooltip.textContent = reason;
-      reasonIcon.appendChild(tooltip);
-      typeRow.appendChild(reasonIcon);
-    }
+    const tooltip = document.createElement("div");
+    tooltip.className = "absolute left-6 top-0 z-10 w-80 rounded-xl bg-slate-900 text-white text-xs leading-relaxed px-3 py-2.5 shadow-xl hidden group-hover:block";
+
+    // Build rich tooltip with similarity metrics
+    const typeDescriptions = {
+      direct: "Head-to-head competitor with similar products, target audience, and pricing model",
+      adjacent: "Related player in the same ecosystem with some feature/audience overlap",
+      aspirational: "Aspirational competitor—larger player or different market segment, but seen as a model"
+    };
+
+    const typeDesc = typeDescriptions[competitorType] || "Competitor identified through research";
+    const industry = competitor.industry_similarity ? Math.round(competitor.industry_similarity) : "—";
+    const product = competitor.product_similarity ? Math.round(competitor.product_similarity) : "—";
+    const audience = competitor.audience_similarity ? Math.round(competitor.audience_similarity) : "—";
+    const size = competitor.size_similarity ? Math.round(competitor.size_similarity) : "—";
+    const model = competitor.business_model_similarity ? Math.round(competitor.business_model_similarity) : "—";
+
+    const reason = competitor.reason_for_similarity || competitor.why_similar || "";
+
+    const tooltipHTML = `
+      <div class="font-semibold mb-1.5 text-white">
+        ${competitorType.toUpperCase()} COMPETITOR
+      </div>
+      <div class="mb-2 text-slate-300">${typeDesc}</div>
+      <div class="grid grid-cols-2 gap-1 text-slate-400 text-xs mb-2 border-t border-slate-700 pt-1.5">
+        <div>• Industry: <span class="text-slate-200 font-medium">${industry}%</span></div>
+        <div>• Product: <span class="text-slate-200 font-medium">${product}%</span></div>
+        <div>• Audience: <span class="text-slate-200 font-medium">${audience}%</span></div>
+        <div>• Size: <span class="text-slate-200 font-medium">${size}%</span></div>
+        <div>• Business model: <span class="text-slate-200 font-medium">${model}%</span></div>
+      </div>
+      ${reason ? `<div class="border-t border-slate-700 pt-1.5 text-slate-300 italic">"${reason}"</div>` : ""}
+    `;
+
+    tooltip.innerHTML = tooltipHTML;
+    reasonIcon.appendChild(tooltip);
+    typeRow.appendChild(reasonIcon);
 
     info.appendChild(typeRow);
   }
@@ -601,8 +647,9 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
   const pricingSection = createPricingSection("Pricing", competitor.pricing, "text-blue-600");
   grid.appendChild(pricingSection);
 
-  // Recent news section (collapsible, only shown if news exists)
-  const newsItems = Array.isArray(competitor.news) ? competitor.news.filter(n => n && n.title) : [];
+  // Recent news section (collapsible, only shown if relevant news exists)
+  const allNewsItems = Array.isArray(competitor.news) ? competitor.news.filter(n => n && n.title) : [];
+  const newsItems = allNewsItems.filter(isRelevantNews);
   if (newsItems.length > 0) {
     const newsWrapper = document.createElement("div");
     newsWrapper.className = "col-span-full mt-2";
@@ -633,7 +680,7 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
       if (item.snippet) {
         const snippetEl = document.createElement("p");
         snippetEl.className = "text-xs text-slate-500 leading-relaxed line-clamp-2";
-        snippetEl.textContent = item.snippet;
+        snippetEl.textContent = item.snippet.substring(0, 150);
         newsItem.appendChild(snippetEl);
       }
 
@@ -643,6 +690,54 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
     details.appendChild(newsBody);
     newsWrapper.appendChild(details);
     grid.appendChild(newsWrapper);
+  }
+
+  // Add competitor navigation buttons
+  const competitors = document.querySelectorAll('[data-competitor-index]') ?
+    Array.from(document.querySelectorAll('[data-competitor-index]')) : [];
+  const competitorCount = competitors.length;
+
+  if (competitorCount > 1) {
+    const navWrapper = document.createElement("div");
+    navWrapper.className = "col-span-full mt-4 flex items-center justify-center gap-4";
+
+    const prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.className = "flex items-center gap-1 px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+    prevBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Previous`;
+    prevBtn.dataset.direction = "prev";
+
+    const counterSpan = document.createElement("span");
+    counterSpan.className = "text-sm font-semibold text-slate-600 whitespace-nowrap";
+    counterSpan.textContent = `${index + 1} of ${competitorCount}`;
+
+    const nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.className = "flex items-center gap-1 px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+    nextBtn.innerHTML = `Next <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
+    nextBtn.dataset.direction = "next";
+
+    // Disable buttons at edges
+    if (index === 0) prevBtn.disabled = true;
+    if (index === competitorCount - 1) nextBtn.disabled = true;
+
+    // Add click handlers
+    const handleNavClick = (e) => {
+      const direction = e.currentTarget.dataset.direction;
+      const nextIndex = direction === "next" ? index + 1 : index - 1;
+      if (nextIndex >= 0 && nextIndex < competitorCount) {
+        const tabs = Array.from(document.querySelectorAll(".competitor-tab"));
+        if (tabs[nextIndex]) tabs[nextIndex].click();
+      }
+    };
+
+    prevBtn.addEventListener("click", handleNavClick);
+    nextBtn.addEventListener("click", handleNavClick);
+
+    navWrapper.appendChild(prevBtn);
+    navWrapper.appendChild(counterSpan);
+    navWrapper.appendChild(nextBtn);
+    grid.appendChild(navWrapper);
   }
 
   article.append(header, grid);
