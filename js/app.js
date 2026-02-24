@@ -127,16 +127,15 @@ let elapsedTime = 0;
 let currentBattlecard = null; // Store current battlecard for PDF generation
 
 const getProgressMessage = (value, elapsedSeconds) => {
-  const estimatedTotal = 120; // Estimated total time in seconds (2 minutes)
+  const estimatedTotal = 45; // Estimated total time in seconds (45 seconds)
   const remaining = Math.max(0, estimatedTotal - elapsedSeconds);
-  const remainingMinutes = Math.floor(remaining / 60);
   const remainingSeconds = Math.floor(remaining % 60);
-  const timeEstimate = remaining > 30 
-    ? ` (~${remainingMinutes}m ${remainingSeconds}s remaining)`
-    : remaining > 0
+  const timeEstimate = remaining > 5
     ? ` (~${remainingSeconds}s remaining)`
+    : remaining > 0
+    ? ` (almost done…)`
     : "";
-  
+
   if (value < 25) return `Analyzing company website…${timeEstimate}`;
   if (value < 50) return `Searching for relevant competitors…${timeEstimate}`;
   if (value < 75) return `Scoring and ranking competitors…${timeEstimate}`;
@@ -412,17 +411,24 @@ const createPricingSection = (title, items, accentClass) => {
 const isRelevantNews = (newsItem) => {
   if (!newsItem || !newsItem.title) return false;
   const title = (newsItem.title + " " + (newsItem.snippet || "")).toLowerCase();
+  // Be more lenient - only filter out comparison articles, not general news
   const irrelevantKeywords = [
-    "alternatives",
-    "competitors",
-    "best X for",
     " vs ",
     "compared to",
+    "top 10",
+    "best alternatives",
     "instead of",
-    "replace",
-    "switch from",
   ];
   return !irrelevantKeywords.some((keyword) => title.includes(keyword));
+};
+
+// Sort news by date (newest first)
+const sortNewsByDate = (newsItems) => {
+  return [...newsItems].sort((a, b) => {
+    const dateA = new Date(a.date || 0).getTime();
+    const dateB = new Date(b.date || 0).getTime();
+    return dateB - dateA;
+  });
 };
 
 // Simplified target card - removed heavy borders and boxes
@@ -518,9 +524,21 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
     websiteLink.textContent = website;
   }
   
+  // Format category/description - clean up messy text with brackets and special characters
+  let categoryText = (competitor.category || "Market competitor").trim();
+  // Clean up common messy formats like "[IDC]", "[Gartner]", "Source: X", etc.
+  categoryText = categoryText
+    .replace(/\[.*?\]/g, "") // Remove [bracketed] content
+    .replace(/Source:\s*/gi, "")
+    .replace(/\*\*/g, "")
+    .split(",")[0] // Just take first part if comma-separated
+    .trim();
+
+  if (!categoryText) categoryText = "Market competitor";
+
   const category = document.createElement("p");
   category.className = "text-xs uppercase tracking-wider text-indigo-600 font-semibold mt-2";
-  category.textContent = competitor.category || "Market competitor";
+  category.textContent = categoryText;
 
   info.appendChild(title);
   if (websiteLink) {
@@ -571,19 +589,26 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
 
     const reason = competitor.reason_for_similarity || competitor.why_similar || "";
 
+    // Check if any similarity metrics are available
+    const hasMetrics = industry !== "—" || product !== "—" || audience !== "—" || size !== "—" || model !== "—";
+
+    const metricsHTML = hasMetrics ? `
+      <div class="grid grid-cols-2 gap-1 text-slate-400 text-xs mb-2 border-t border-slate-700 pt-1.5">
+        ${industry !== "—" ? `<div>• Industry: <span class="text-slate-200 font-medium">${industry}%</span></div>` : ""}
+        ${product !== "—" ? `<div>• Product: <span class="text-slate-200 font-medium">${product}%</span></div>` : ""}
+        ${audience !== "—" ? `<div>• Audience: <span class="text-slate-200 font-medium">${audience}%</span></div>` : ""}
+        ${size !== "—" ? `<div>• Size: <span class="text-slate-200 font-medium">${size}%</span></div>` : ""}
+        ${model !== "—" ? `<div>• Business model: <span class="text-slate-200 font-medium">${model}%</span></div>` : ""}
+      </div>
+    ` : "";
+
     const tooltipHTML = `
       <div class="font-semibold mb-1.5 text-white">
         ${competitorType.toUpperCase()} COMPETITOR
       </div>
       <div class="mb-2 text-slate-300">${typeDesc}</div>
-      <div class="grid grid-cols-2 gap-1 text-slate-400 text-xs mb-2 border-t border-slate-700 pt-1.5">
-        <div>• Industry: <span class="text-slate-200 font-medium">${industry}%</span></div>
-        <div>• Product: <span class="text-slate-200 font-medium">${product}%</span></div>
-        <div>• Audience: <span class="text-slate-200 font-medium">${audience}%</span></div>
-        <div>• Size: <span class="text-slate-200 font-medium">${size}%</span></div>
-        <div>• Business model: <span class="text-slate-200 font-medium">${model}%</span></div>
-      </div>
-      ${reason ? `<div class="border-t border-slate-700 pt-1.5 text-slate-300 italic">"${reason}"</div>` : ""}
+      ${metricsHTML}
+      ${reason ? `<div class="${hasMetrics ? "border-t border-slate-700 pt-1.5" : ""} text-slate-300 italic">"${reason}"</div>` : ""}
     `;
 
     tooltip.innerHTML = tooltipHTML;
@@ -616,7 +641,8 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
 
   // Recent news section (collapsible, only shown if relevant news exists)
   const allNewsItems = Array.isArray(competitor.news) ? competitor.news.filter(n => n && n.title) : [];
-  const newsItems = allNewsItems.filter(isRelevantNews);
+  let newsItems = allNewsItems.filter(isRelevantNews);
+  newsItems = sortNewsByDate(newsItems).slice(0, 8); // Show top 8 most recent articles
   if (newsItems.length > 0) {
     const newsWrapper = document.createElement("div");
     newsWrapper.className = "col-span-full mt-2";
@@ -670,19 +696,21 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
 
     const prevBtn = document.createElement("button");
     prevBtn.type = "button";
-    prevBtn.className = "flex items-center gap-1 px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-    prevBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Previous`;
+    prevBtn.className = "flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-sm transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-md";
+    prevBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> <span>Previous</span>`;
     prevBtn.dataset.direction = "prev";
+    prevBtn.setAttribute("aria-label", "View previous competitor");
 
     const counterSpan = document.createElement("span");
-    counterSpan.className = "text-sm font-semibold text-slate-600 whitespace-nowrap";
-    counterSpan.textContent = `${index + 1} of ${competitorCount}`;
+    counterSpan.className = "text-sm font-bold text-slate-700 whitespace-nowrap px-3 py-2.5 bg-slate-100 rounded-lg";
+    counterSpan.innerHTML = `<span class="text-indigo-600">${index + 1}</span><span class="text-slate-500"> / ${competitorCount}</span>`;
 
     const nextBtn = document.createElement("button");
     nextBtn.type = "button";
-    nextBtn.className = "flex items-center gap-1 px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-    nextBtn.innerHTML = `Next <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
+    nextBtn.className = "flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-sm transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-md";
+    nextBtn.innerHTML = `<span>Next</span> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
     nextBtn.dataset.direction = "next";
+    nextBtn.setAttribute("aria-label", "View next competitor");
 
     // Disable buttons at edges
     if (index === 0) prevBtn.disabled = true;
@@ -1075,6 +1103,28 @@ if (selectors.urlInput) {
 if (selectors.form) {
   selectors.form.addEventListener("submit", handleSubmit);
 }
+
+// Add keyboard navigation for competitors (arrow keys)
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+
+  const tabs = Array.from(document.querySelectorAll(".competitor-tab"));
+  if (tabs.length === 0) return;
+
+  const activeTab = Array.from(document.querySelectorAll(".competitor-tab")).find(t => t.classList.contains("active"));
+  if (!activeTab) return;
+
+  const currentIndex = tabs.indexOf(activeTab);
+  if (currentIndex === -1) return;
+
+  if (e.key === "ArrowRight" && currentIndex < tabs.length - 1) {
+    e.preventDefault();
+    tabs[currentIndex + 1].click();
+  } else if (e.key === "ArrowLeft" && currentIndex > 0) {
+    e.preventDefault();
+    tabs[currentIndex - 1].click();
+  }
+});
 
 // Initialize saved battlecards UI on page load
 if (document.readyState === 'loading') {
