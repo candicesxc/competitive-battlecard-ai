@@ -306,10 +306,49 @@ const createSection = (title, items, accentClass) => {
   section.className =
     "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md transition-all duration-200 hover:shadow-lg";
 
+  const titleRow = document.createElement("div");
+  titleRow.className = "flex items-center justify-between mb-3";
+
   const heading = document.createElement("h3");
-  heading.className = `section-title mb-3 ${accentClass}`;
+  heading.className = `section-title ${accentClass}`;
   heading.textContent = title;
-  section.appendChild(heading);
+  titleRow.appendChild(heading);
+
+  // Add copy button to all sections
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors shrink-0 ml-2";
+  copyBtn.setAttribute("aria-label", `Copy ${title}`);
+  copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span>Copy</span>`;
+
+  copyBtn.addEventListener("click", () => {
+    if (!items || items.length === 0) return;
+    const text = items.map((item) => `• ${item}`).join("\n");
+    navigator.clipboard.writeText(text).then(() => {
+      const label = copyBtn.querySelector("span");
+      if (label) {
+        label.textContent = "Copied!";
+        copyBtn.classList.add("text-emerald-600");
+        setTimeout(() => {
+          label.textContent = "Copy";
+          copyBtn.classList.remove("text-emerald-600");
+        }, 2000);
+      }
+    }).catch(() => {
+      // Fallback for environments without clipboard API
+      const textArea = document.createElement("textarea");
+      textArea.value = items.map((item) => `• ${item}`).join("\n");
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+    });
+  });
+
+  titleRow.appendChild(copyBtn);
+  section.appendChild(titleRow);
 
   if (!items || items.length === 0) {
     const empty = document.createElement("p");
@@ -384,78 +423,6 @@ const isRelevantNews = (newsItem) => {
     "switch from",
   ];
   return !irrelevantKeywords.some((keyword) => title.includes(keyword));
-};
-
-// Section with copy-to-clipboard button (used for Key Differentiators and Potential Landmines)
-const createCopyableSection = (title, items, accentClass) => {
-  const section = document.createElement("div");
-  section.className =
-    "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md transition-all duration-200 hover:shadow-lg";
-
-  const titleRow = document.createElement("div");
-  titleRow.className = "flex items-center justify-between mb-3";
-
-  const heading = document.createElement("h3");
-  heading.className = `section-title ${accentClass}`;
-  heading.textContent = title;
-  titleRow.appendChild(heading);
-
-  // Copy button
-  const copyBtn = document.createElement("button");
-  copyBtn.type = "button";
-  copyBtn.className = "flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors shrink-0 ml-2";
-  copyBtn.setAttribute("aria-label", `Copy ${title}`);
-  copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span>Copy</span>`;
-
-  copyBtn.addEventListener("click", () => {
-    if (!items || items.length === 0) return;
-    const text = items.map((item) => `• ${item}`).join("\n");
-    navigator.clipboard.writeText(text).then(() => {
-      const label = copyBtn.querySelector("span");
-      if (label) {
-        label.textContent = "Copied!";
-        copyBtn.classList.add("text-emerald-600");
-        setTimeout(() => {
-          label.textContent = "Copy";
-          copyBtn.classList.remove("text-emerald-600");
-        }, 2000);
-      }
-    }).catch(() => {
-      // Fallback for environments without clipboard API
-      const textArea = document.createElement("textarea");
-      textArea.value = items.map((item) => `• ${item}`).join("\n");
-      textArea.style.position = "fixed";
-      textArea.style.opacity = "0";
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
-    });
-  });
-
-  titleRow.appendChild(copyBtn);
-  section.appendChild(titleRow);
-
-  if (!items || items.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "text-sm text-slate-400 italic";
-    empty.textContent = "No data available.";
-    section.appendChild(empty);
-    return section;
-  }
-
-  const list = document.createElement("ul");
-  list.className = "space-y-2.5 text-sm leading-relaxed text-slate-700 list-none";
-
-  items.forEach((item) => {
-    const li = document.createElement("li");
-    li.className = "flex items-start gap-2.5 before:content-['•'] before:text-indigo-500 before:font-bold before:flex-shrink-0 before:mt-0.5";
-    li.textContent = item;
-    list.appendChild(li);
-  });
-
-  section.appendChild(list);
-  return section;
 };
 
 // Simplified target card - removed heavy borders and boxes
@@ -635,8 +602,8 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
     createSection("Products", competitor.products, "text-blue-600"),
     createSection("Strengths", competitor.strengths, "text-emerald-600"),
     createSection("Weaknesses", competitor.weaknesses, "text-slate-500"),
-    createCopyableSection("Key Differentiators", competitor.how_we_win, "text-red-500"),
-    createCopyableSection(
+    createSection("Key Differentiators", competitor.how_we_win, "text-red-500"),
+    createSection(
       "Potential landmines",
       competitor.potential_landmines,
       "text-purple-500",
