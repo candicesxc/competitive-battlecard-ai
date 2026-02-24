@@ -408,28 +408,6 @@ const createPricingSection = (title, items, accentClass) => {
 // createScoreBar function removed - competitive score no longer displayed in UI
 
 // Filter out irrelevant news (listicles, comparison articles, etc.)
-const isRelevantNews = (newsItem) => {
-  if (!newsItem || !newsItem.title) return false;
-  const title = (newsItem.title + " " + (newsItem.snippet || "")).toLowerCase();
-  // Be more lenient - only filter out comparison articles, not general news
-  const irrelevantKeywords = [
-    " vs ",
-    "compared to",
-    "top 10",
-    "best alternatives",
-    "instead of",
-  ];
-  return !irrelevantKeywords.some((keyword) => title.includes(keyword));
-};
-
-// Sort news by date (newest first)
-const sortNewsByDate = (newsItems) => {
-  return [...newsItems].sort((a, b) => {
-    const dateA = new Date(a.date || 0).getTime();
-    const dateB = new Date(b.date || 0).getTime();
-    return dateB - dateA;
-  });
-};
 
 // Simplified target card - removed heavy borders and boxes
 // Market snapshot is now clearly its own separate section
@@ -639,51 +617,6 @@ const createCompetitorCard = (competitor, index, isActive = false) => {
   const pricingSection = createPricingSection("Pricing", competitor.pricing, "text-blue-600");
   grid.appendChild(pricingSection);
 
-  // Recent news section (collapsible, only shown if relevant news exists)
-  const allNewsItems = Array.isArray(competitor.news) ? competitor.news.filter(n => n && n.title) : [];
-  let newsItems = allNewsItems.filter(isRelevantNews);
-  newsItems = sortNewsByDate(newsItems).slice(0, 8); // Show top 8 most recent articles
-  if (newsItems.length > 0) {
-    const newsWrapper = document.createElement("div");
-    newsWrapper.className = "col-span-full mt-2";
-
-    const details = document.createElement("details");
-    details.className = "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm shadow-md overflow-hidden";
-
-    const summary = document.createElement("summary");
-    summary.className = "flex items-center justify-between gap-2 px-6 py-4 cursor-pointer select-none list-none text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors";
-    summary.innerHTML = `<span class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>Recent news <span class="text-slate-400 font-normal">(${newsItems.length})</span></span><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="details-chevron text-slate-400 transition-transform"><polyline points="6 9 12 15 18 9"/></svg>`;
-    details.appendChild(summary);
-
-    const newsBody = document.createElement("div");
-    newsBody.className = "px-6 pb-5 pt-1 space-y-3";
-
-    newsItems.forEach((item) => {
-      const newsItem = document.createElement("div");
-      newsItem.className = "flex flex-col gap-0.5";
-
-      const titleEl = document.createElement("a");
-      titleEl.href = item.link || "#";
-      titleEl.target = "_blank";
-      titleEl.rel = "noopener noreferrer";
-      titleEl.className = "text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline leading-snug transition-colors";
-      titleEl.textContent = item.title;
-      newsItem.appendChild(titleEl);
-
-      if (item.snippet) {
-        const snippetEl = document.createElement("p");
-        snippetEl.className = "text-xs text-slate-500 leading-relaxed line-clamp-2";
-        snippetEl.textContent = item.snippet.substring(0, 150);
-        newsItem.appendChild(snippetEl);
-      }
-
-      newsBody.appendChild(newsItem);
-    });
-
-    details.appendChild(newsBody);
-    newsWrapper.appendChild(details);
-    grid.appendChild(newsWrapper);
-  }
 
   // Add competitor navigation buttons
   const competitors = document.querySelectorAll('[data-competitor-index]') ?
