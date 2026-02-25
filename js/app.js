@@ -764,9 +764,16 @@ const renderBattlecards = (data, companyUrl = null) => {
   // Render Market Overview (shown in right panel when nav link clicked)
   const marketOverviewContent = document.getElementById("market-overview-content");
   if (marketOverviewContent) {
-    marketOverviewContent.innerHTML = data.market_summary
-      ? `<p class="text-slate-300 leading-relaxed">${data.market_summary}</p>`
-      : `<p class="text-slate-500">No market summary available.</p>`;
+    let html = data.market_summary
+      ? `<p class="text-slate-300 leading-relaxed mb-8">${data.market_summary}</p>`
+      : `<p class="text-slate-500 mb-8">No market summary available.</p>`;
+
+    // Add competitive landscape comparison matrix
+    if (data.competitors && data.competitors.length > 0) {
+      html += buildCompetitiveMatrix(data.target_company, data.competitors);
+    }
+
+    marketOverviewContent.innerHTML = html;
   }
 
   // Render Target Company Profile
@@ -778,40 +785,75 @@ const renderBattlecards = (data, companyUrl = null) => {
   if (targetProfileContent) {
     const hasData = target.overview || target.products?.length || target.strengths?.length || target.weaknesses?.length || target.pricing?.length;
     if (hasData) {
-      // Build card-based layout matching competitor cards
-      let html = `<div class="competitor-sections">`;
+      // Build full-width layout matching competitor cards structure
+      let html = ``;
 
-      const sections = [
-        { emoji: "📋", label: "Overview", items: target.overview ? [target.overview] : [] },
-        { emoji: "📦", label: "Products", items: target.products || [] },
-        { emoji: "💪", label: "Strengths", items: target.strengths || [] },
-        { emoji: "⚠️", label: "Weaknesses", items: target.weaknesses || [] },
-        { emoji: "💰", label: "Pricing", items: target.pricing || [] },
-      ];
+      // 1. Overview (full width)
+      if (target.overview) {
+        html += `
+          <div class="section-block mt-4">
+            <div class="section-title mb-2">📋 Overview</div>
+            <div class="overview-text text-slate-300">${target.overview}</div>
+          </div>`;
+      }
 
-      sections.forEach(({ emoji, label, items }) => {
-        if (items?.length) {
+      // 2. Products (full width)
+      if (target.products && target.products.length > 0) {
+        html += `
+          <div class="section-block mt-4">
+            <div class="section-header">
+              <h3 class="section-title">📦 Products</h3>
+            </div>
+            <div class="section-content space-y-2">
+              ${target.products.map(item => `<div class="text-slate-300">• ${item}</div>`).join("")}
+            </div>
+          </div>`;
+      }
+
+      // 3 & 4. Strengths + Weaknesses (two columns)
+      if ((target.strengths && target.strengths.length > 0) || (target.weaknesses && target.weaknesses.length > 0)) {
+        html += `<div class="competitor-sections">`;
+
+        if (target.strengths && target.strengths.length > 0) {
           html += `
             <div class="section-block">
               <div class="section-header">
-                <h3 class="section-title">${emoji} ${label}</h3>
+                <h3 class="section-title">💪 Strengths</h3>
               </div>
-              <div class="section-content">
-                ${items.map(item => {
-                  if (label === "Strengths") {
-                    return `<div class="strength">${item}</div>`;
-                  } else if (label === "Weaknesses") {
-                    return `<div class="weakness">${item}</div>`;
-                  } else {
-                    return `<div>${item}</div>`;
-                  }
-                }).join("")}
+              <div class="section-content space-y-2">
+                ${target.strengths.map(item => `<div class="strength text-emerald-400">✓ ${item}</div>`).join("")}
               </div>
             </div>`;
         }
-      });
 
-      html += `</div>`;
+        if (target.weaknesses && target.weaknesses.length > 0) {
+          html += `
+            <div class="section-block">
+              <div class="section-header">
+                <h3 class="section-title">⚠️ Weaknesses</h3>
+              </div>
+              <div class="section-content space-y-2">
+                ${target.weaknesses.map(item => `<div class="weakness text-slate-400">✗ ${item}</div>`).join("")}
+              </div>
+            </div>`;
+        }
+
+        html += `</div>`;
+      }
+
+      // 5. Pricing (full width)
+      if (target.pricing && target.pricing.length > 0) {
+        html += `
+          <div class="section-block mt-4">
+            <div class="section-header">
+              <h3 class="section-title">💰 Pricing</h3>
+            </div>
+            <div class="section-content space-y-2">
+              ${target.pricing.map(item => `<div class="text-slate-300">• ${item}</div>`).join("")}
+            </div>
+          </div>`;
+      }
+
       targetProfileContent.innerHTML = html;
     } else {
       targetProfileContent.innerHTML = `<p class="text-slate-500">No company profile available.</p>`;
@@ -902,6 +944,110 @@ const renderBattlecards = (data, companyUrl = null) => {
     // Initialize Next Steps section for sales playbook generation
     initializeNextSteps(currentBattlecard);
   }
+};
+
+// Build competitive landscape matrix visualization
+const buildCompetitiveMatrix = (targetCompany, competitors) => {
+  if (!competitors || competitors.length === 0) return "";
+
+  const targetName = targetCompany?.company_name || "Your Company";
+  const allCompanies = [targetCompany, ...competitors].filter(c => c);
+
+  // Dimension scoring: 1-5 scale where 5 is strongest
+  const scoreDimensions = (company) => {
+    const aiCapability = company.overview?.toLowerCase().includes("ai") ? 4 :
+                         company.how_we_win?.some(w => w.toLowerCase().includes("ai")) ? 5 : 2;
+    const scalability = company.strengths?.length > 2 ? 5 : 3;
+    const governance = company.overview?.toLowerCase().includes("govern") ||
+                       company.how_we_win?.some(w => w.toLowerCase().includes("govern")) ? 5 : 3;
+    const ease = company.overview?.toLowerCase().includes("easy") ||
+                 company.how_we_win?.some(w => w.toLowerCase().includes("simple")) ? 4 : 3;
+    const integration = company.how_we_win?.some(w => w.toLowerCase().includes("integrat")) ? 5 :
+                        company.strengths?.length > 1 ? 4 : 2;
+    const deployment = company.weaknesses?.some(w => w.toLowerCase().includes("deploy")) ? 2 :
+                       company.how_we_win?.some(w => w.toLowerCase().includes("hybrid")) ? 5 : 3;
+
+    return { aiCapability, scalability, governance, ease, integration, deployment };
+  };
+
+  const dimensionLabels = ["AI & Innovation", "Scalability", "Governance", "Ease of Use", "Integrations", "Deployment Flex"];
+  const dimensionKeys = ["aiCapability", "scalability", "governance", "ease", "integration", "deployment"];
+
+  // Score all companies
+  const scores = {};
+  allCompanies.forEach(c => {
+    scores[c.company_name || "Company"] = scoreDimensions(c);
+  });
+
+  // Build matrix HTML
+  let html = `
+    <div class="mt-8 pt-8 border-t border-slate-700/30">
+      <h3 class="text-base font-semibold text-slate-100 mb-6">Competitive Landscape Matrix</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse text-sm">
+          <thead>
+            <tr class="border-b border-slate-700/50">
+              <th class="text-left py-3 px-4 font-semibold text-slate-300 bg-slate-900/50">Dimension</th>`;
+
+  allCompanies.forEach(company => {
+    const name = company.company_name || "Company";
+    const isTarget = name === targetName;
+    html += `<th class="text-center py-3 px-4 font-semibold ${isTarget ? 'bg-indigo-950/40 text-indigo-300 border-l-2 border-indigo-500' : 'text-slate-300'}">${name}</th>`;
+  });
+
+  html += `</tr></thead><tbody>`;
+
+  // Add rows for each dimension
+  dimensionLabels.forEach((label, idx) => {
+    const key = dimensionKeys[idx];
+    html += `<tr class="border-b border-slate-700/20 hover:bg-slate-900/30"><td class="py-3 px-4 font-medium text-slate-300">${label}</td>`;
+
+    allCompanies.forEach(company => {
+      const name = company.company_name || "Company";
+      const isTarget = name === targetName;
+      const score = scores[name][key];
+      const barWidth = (score / 5) * 100;
+      const color = score >= 4 ? "bg-emerald-600/60" : score >= 3 ? "bg-amber-600/60" : "bg-slate-600/40";
+
+      html += `<td class="py-3 px-4 text-center ${isTarget ? 'bg-indigo-950/20 border-l-2 border-indigo-500' : ''}">
+        <div class="flex items-center justify-center gap-2">
+          <div class="w-12 h-6 bg-slate-800/50 rounded border border-slate-700/50 overflow-hidden">
+            <div class="${color} h-full transition-all" style="width: ${barWidth}%"></div>
+          </div>
+          <span class="text-xs font-semibold text-slate-300">${score}/5</span>
+        </div>
+      </td>`;
+    });
+
+    html += `</tr>`;
+  });
+
+  html += `
+    </tbody>
+    </table>
+  </div>
+
+  <div class="mt-6 grid grid-cols-2 gap-4 text-xs">
+    <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
+      <p class="font-semibold text-slate-300 mb-1">🟢 Strong (4-5)</p>
+      <p class="text-slate-400">Clear competitive advantage</p>
+    </div>
+    <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
+      <p class="font-semibold text-slate-300 mb-1">🟡 Moderate (3)</p>
+      <p class="text-slate-400">Comparable to competitors</p>
+    </div>
+    <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
+      <p class="font-semibold text-slate-300 mb-1">🔴 Weak (1-2)</p>
+      <p class="text-slate-400">Area of concern</p>
+    </div>
+    <div class="p-3 rounded-lg bg-indigo-950/30 border border-indigo-700/30">
+      <p class="font-semibold text-indigo-300 mb-1">📍 Your Company</p>
+      <p class="text-slate-400">Highlighted for reference</p>
+    </div>
+  </div>
+`;
+
+  return html;
 };
 
 // Calculate threat level based on competitor data
