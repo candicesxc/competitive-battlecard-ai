@@ -935,26 +935,33 @@ const createNewCompetitorCard = (competitor, index) => {
   nameEl.textContent = competitor.company_name || `Competitor ${index + 1}`;
   details.appendChild(nameEl);
 
+  // Only show metrics if they exist in the actual data
   const metricsDiv = document.createElement("div");
   metricsDiv.className = "competitor-metrics";
 
-  // Sample metrics (can be enhanced with real data)
-  const metrics = [
-    { label: "Win Rate", value: `${Math.floor(Math.random() * 40 + 40)}%` },
-    { label: "F500 Usage", value: `${Math.floor(Math.random() * 40 + 40)}%` },
-    { label: "Market Share", value: `${Math.floor(Math.random() * 30 + 10)}%` }
-  ];
+  const realMetrics = [];
+  if (competitor.similarity_score) {
+    realMetrics.push({ label: "Similarity", value: `${competitor.similarity_score}%` });
+  }
+  if (competitor.competitive_score) {
+    realMetrics.push({ label: "Threat Score", value: `${competitor.competitive_score}/10` });
+  }
+  if (competitor.score_vs_target) {
+    realMetrics.push({ label: "Competition", value: `${competitor.score_vs_target}/10` });
+  }
 
-  metrics.forEach(metric => {
-    const metricDiv = document.createElement("div");
-    metricDiv.className = "metric";
-    metricDiv.innerHTML = `
-      <span class="metric-label">${metric.label}</span>
-      <span class="metric-value">${metric.value}</span>
-    `;
-    metricsDiv.appendChild(metricDiv);
-  });
-  details.appendChild(metricsDiv);
+  if (realMetrics.length > 0) {
+    realMetrics.forEach(metric => {
+      const metricDiv = document.createElement("div");
+      metricDiv.className = "metric";
+      metricDiv.innerHTML = `
+        <span class="metric-label">${metric.label}</span>
+        <span class="metric-value">${metric.value}</span>
+      `;
+      metricsDiv.appendChild(metricDiv);
+    });
+    details.appendChild(metricsDiv);
+  }
   info.appendChild(details);
   header.appendChild(info);
 
