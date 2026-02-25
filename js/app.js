@@ -1974,7 +1974,7 @@ const generateSalesPlaybook = async (targetCompany, selectedCompetitorName, data
         : targetCompany.url,
     };
 
-    const response = await fetch("/api/research", {
+    const response = await fetch(`${BACKEND_BASE_URL}/research`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(researchPayload),
@@ -1987,6 +1987,9 @@ const generateSalesPlaybook = async (targetCompany, selectedCompetitorName, data
       enrichedTargetData.priorities = research.priorities || [];
       enrichedTargetData.industry = research.industry || null;
       enrichedTargetData.companySize = research.company_size || null;
+      console.log("Successfully researched target:", enrichedTargetData);
+    } else {
+      console.warn("Research request failed with status:", response.status);
     }
   } catch (err) {
     console.warn("Target research failed, proceeding with basic data", err);
