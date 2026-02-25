@@ -1477,120 +1477,167 @@ const extractDomain = (url = "") => {
   catch { return url; }
 };
 
-// Turn a differentiator bullet into a discovery question the rep can ask
-const differentiatorToQuestion = (diff, competitorName) => {
-  const l = diff.toLowerCase();
-  // Pattern matching to produce natural questions
-  if (l.includes("accredit") || l.includes("recogni") || l.includes("verif"))
-    return "Does the credential you earn need to be verifiable by an employer, or is personal development the goal?";
-  if (l.includes("certif") || l.includes("certificate"))
-    return "Have you looked at whether the certifications offered are recognized by the specific companies you want to work with?";
-  if (l.includes("degree") || l.includes("universit") || l.includes("academic"))
-    return "Is a university-backed degree on the table, or are you looking for something shorter?";
-  if (l.includes("employer") || l.includes("hire") || l.includes("hir") || l.includes("job pipeline"))
-    return "Are you measuring success by the job or promotion you land — or just by completing the course?";
-  if (l.includes("ai") || l.includes("deepfake") || l.includes("phish") || l.includes("threat"))
-    return "Is the training you're evaluating built for the threats you're facing today, or is it curriculum from a few years ago?";
-  if (l.includes("adaptive") || l.includes("personaliz") || l.includes("tailor"))
-    return "Does the platform adapt to each learner, or is everyone getting the same content regardless of where they are?";
-  if (l.includes("price") || l.includes("cost") || l.includes("roi") || l.includes("invest"))
-    return "When you're comparing costs, are you comparing what each option actually produces — not just the subscription fee?";
-  if (l.includes("support") || l.includes("integrat") || l.includes("onboard"))
-    return "What does the vendor's support look like after you sign — and how long does it take to see results?";
-  if (l.includes("partner") || l.includes("google") || l.includes("ibm") || l.includes("microsoft"))
-    return "Are the companies that designed this curriculum ones your prospects or employers would recognize by name?";
-  // Generic fallback: pull first 8 words as context
-  const core = diff.replace(/^[^a-zA-Z]*/, "").split(" ").slice(0, 7).join(" ").toLowerCase();
-  return `Have you evaluated how "${core}" holds up against what you actually need to accomplish?`;
+// ── Context relevance helpers ──────────────────────────────────────────────
+const getContextKeywords = (text) => {
+  const stop = new Set(["a","an","the","in","on","at","to","for","of","and","or","but","with",
+    "that","this","is","are","was","were","be","been","have","has","do","does","did","will",
+    "would","could","should","may","might","can","from","by","as","into","their","they","it",
+    "its","my","our","your","his","her","we","i","you","he","she","who","what","which","when",
+    "where","how","very","just","also","more","most","some","any","all","both","each","than","so"]);
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/)
+    .filter(w => w.length > 3 && !stop.has(w));
 };
 
-// Build the pricing narrative from both pricing arrays
-const buildPricingNarrative = (theirPricing, ourPricing, theirName, ourName) => {
-  const theirLine = theirPricing[0] || null;
-  const ourLine = ourPricing[0] || null;
-  if (!theirLine && !ourLine) return null;
-  let narrative = "";
-  if (theirLine) narrative += `**${theirName}:** ${theirLine}`;
-  if (theirLine && ourLine) narrative += `\n**${ourName}:** ${ourLine}`;
-  else if (ourLine) narrative += `**${ourName}:** ${ourLine}`;
-  // Add remaining pricing tiers
-  const extras = [
-    ...theirPricing.slice(1).map(p => `${theirName}: ${p}`),
-    ...ourPricing.slice(1).map(p => `${ourName}: ${p}`)
-  ];
-  if (extras.length) narrative += `\n${extras.join(" · ")}`;
-  return narrative;
+const scoreRelevance = (text, keywords) =>
+  keywords.filter(kw => text.toLowerCase().includes(kw)).length;
+
+// Return items sorted most-relevant-to-persona/company first
+const rankByContext = (items, keywords) => {
+  if (!keywords.length) return items;
+  return [...items]
+    .map((item, i) => ({ item, score: scoreRelevance(item, keywords), i }))
+    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .map(o => o.item);
 };
 
-// Build a one-paragraph positioning angle from differentiators + their first weakness
-const buildPositioningAngle = (differentiators, theirWeaknesses, theirName, ourName, contextLabel) => {
+// Short first-clause of context for inline use: "mid-career professional switching into tech"
+const firstClause = (text) => text.split(/[.,;]/)[0].trim().toLowerCase();
+
+// ── Per-section builders — every one takes contextLabel + contextDetails ──
+
+// 1. Positioning angle
+const buildPositioningAngle = (differentiators, theirWeaknesses, theirName, ourName, contextLabel, contextDetails, isB2C) => {
   const d1 = differentiators[0] || "";
   const d2 = differentiators[1] || "";
   const w1 = theirWeaknesses[0] || "";
-  let angle = "";
-  if (d1) angle += `${d1}.`;
-  if (w1) angle += ` Meanwhile, ${theirName} ${w1.charAt(0).toLowerCase() + w1.slice(1)}`.replace(/\.$/, "") + ".";
-  if (d2 && d2 !== d1) angle += ` ${d2}.`;
-  return angle.trim() || `${ourName} has measurable advantages over ${theirName} for ${contextLabel}.`;
+
+  const forWhom = isB2C && contextDetails
+    ? `For someone ${firstClause(contextDetails)}`
+    : `For ${contextLabel}`;
+
+  let angle = `${forWhom}, ${ourName} has a clear edge over ${theirName}.`;
+  if (d1) angle += ` ${d1.replace(/\.$/, "")}.`;
+  if (w1) angle += ` ${theirName}'s gap: ${w1.charAt(0).toLowerCase() + w1.slice(1).replace(/\.$/, "")}.`;
+  if (d2 && d2 !== d1) angle += ` ${d2.replace(/\.$/, "")}.`;
+  return angle;
 };
 
-// Build the playbook data structure from existing battlecard fields
-const buildPlaybookFromBattlecard = (competitor, yourCompany, targetContext) => {
-  const differentiators = competitor.how_we_win || [];
-  const landmines      = competitor.potential_landmines || [];
-  const theirStrengths = competitor.strengths || [];
-  const theirWeaknesses = competitor.weaknesses || [];
-  const theirPricing   = competitor.pricing || [];
-  const ourPricing     = yourCompany.pricing || [];
-  const ourName        = yourCompany.company_name || "Us";
-  const theirName      = competitor.company_name || "Competitor";
+// 2. Opening hook
+const buildOpeningHook = (theirName, contextLabel, contextDetails, isB2C) => {
+  if (isB2C && contextDetails)
+    return `"You mentioned you're ${firstClause(contextDetails)}. The question isn't whether ${theirName} has content — it's whether what you get from them actually achieves that. Let's start there."`;
+  if (!isB2C && contextLabel && contextLabel !== "the prospect")
+    return `"For a company like ${contextLabel}, the evaluation shouldn't stop at feature comparison against ${theirName}. What matters is which option moves the metric you care about. Let's dig into that."`;
+  return `"${theirName} is a known name — but let's compare outcomes, not just features. What does success actually look like for you?"`;
+};
 
-  const isB2C = targetContext.type === "b2c";
-  const contextLabel = isB2C
+// 3. Lead-withs — each differentiator reframed around the audience
+const buildLeadWiths = (differentiators, contextLabel, contextDetails, isB2C) => {
+  const prefix = isB2C && contextDetails
+    ? `For someone ${firstClause(contextDetails)}`
+    : `For ${contextLabel}`;
+  return differentiators.map(d => `${prefix}: ${d.replace(/\.$/, "")}`);
+};
+
+// 4. Watch Out For — landmine + audience-specific counter
+const buildWatchOutFor = (landmines, differentiators, contextLabel, contextDetails, isB2C) => {
+  const audience = isB2C && contextDetails ? firstClause(contextDetails) : contextLabel;
+  return landmines.map((landmine, i) => {
+    const base = differentiators[i % Math.max(differentiators.length, 1)] || "";
+    const counter = base
+      ? `${base.replace(/\.$/, "")} — especially relevant for ${audience}.`
+      : `Keep the conversation focused on what matters most for ${audience}.`;
+    return { landmine, counter };
+  });
+};
+
+// 5. Discovery questions — persona/company prefix on every question
+const differentiatorToQuestion = (diff, theirName, contextLabel, contextDetails, isB2C) => {
+  const l = diff.toLowerCase();
+  let q;
+  if (l.includes("accredit") || l.includes("recogni") || l.includes("verif"))
+    q = "Does the credential need to be verifiable by an employer — or is personal development enough?";
+  else if (l.includes("certif") || l.includes("certificate"))
+    q = "Are the certifications recognized by the specific employers or institutions you're targeting?";
+  else if (l.includes("degree") || l.includes("universit") || l.includes("academic"))
+    q = "Is a university-backed credential on the table, or are you looking for something shorter-term?";
+  else if (l.includes("employer") || l.includes("hire") || l.includes("hir") || l.includes("job pipeline"))
+    q = "Are you measuring success by the role change you land — or just by completing the course?";
+  else if (l.includes("ai") || l.includes("deepfake") || l.includes("phish") || l.includes("threat"))
+    q = "Is the training built for today's threats — or is it curriculum that hasn't changed in years?";
+  else if (l.includes("adaptive") || l.includes("personaliz") || l.includes("tailor"))
+    q = "Does the platform adapt to each learner, or does everyone get the same experience regardless?";
+  else if (l.includes("price") || l.includes("cost") || l.includes("roi") || l.includes("invest"))
+    q = "When comparing costs, are you looking at the outcome delivered — not just the price tag?";
+  else if (l.includes("support") || l.includes("integrat") || l.includes("onboard"))
+    q = "What does support look like after you sign — and how quickly do you see measurable results?";
+  else if (l.includes("partner") || l.includes("google") || l.includes("ibm") || l.includes("microsoft"))
+    q = "Are the companies behind this curriculum ones your buyers or employers would actually recognize?";
+  else {
+    const core = diff.replace(/^[^a-zA-Z]*/, "").split(" ").slice(0, 7).join(" ").toLowerCase();
+    q = `Does "${core}" actually move the needle on what you're trying to accomplish?`;
+  }
+  // Prefix with persona or company
+  if (isB2C && contextDetails)
+    return `Given that you're ${firstClause(contextDetails)}: ${q}`;
+  if (!isB2C && contextLabel && contextLabel !== "the prospect")
+    return `For a company like ${contextLabel}: ${q}`;
+  return q;
+};
+
+// 6. Pricing — persona/company-specific ROI framing first
+const buildPricingNarrative = (theirPricing, ourPricing, theirName, ourName, contextLabel, contextDetails, isB2C) => {
+  const theirLine = theirPricing[0] || null;
+  const ourLine   = ourPricing[0]   || null;
+  if (!theirLine && !ourLine) return null;
+
+  const roiAngle = isB2C && contextDetails
+    ? `For someone ${firstClause(contextDetails)}: the ROI question isn't which is cheaper — it's which one actually gets you to your goal.`
+    : `For ${contextLabel}: total cost of ownership matters more than list price. Factor in time-to-value, not just the monthly fee.`;
+
+  let out = roiAngle + "\n\n";
+  if (theirLine) out += `**${theirName}:** ${theirLine}`;
+  if (theirLine && ourLine) out += `\n**${ourName}:** ${ourLine}`;
+  else if (ourLine) out += `**${ourName}:** ${ourLine}`;
+  const extras = [
+    ...theirPricing.slice(1).map(p => `${theirName}: ${p}`),
+    ...ourPricing.slice(1).map(p =>   `${ourName}: ${p}`)
+  ];
+  if (extras.length) out += `\n${extras.join("  ·  ")}`;
+  return out;
+};
+
+// ── Main builder ───────────────────────────────────────────────────────────
+const buildPlaybookFromBattlecard = (competitor, yourCompany, targetContext) => {
+  const isB2C          = targetContext.type === "b2c";
+  const contextLabel   = isB2C
     ? (targetContext.persona_name || "your prospect")
     : (targetContext.url ? extractDomain(targetContext.url) : "the prospect");
   const contextDetails = isB2C
     ? (targetContext.persona_context || "")
     : (targetContext.context || "");
 
-  // Positioning angle: first 2 differentiators + their first weakness
-  const positioningAngle = buildPositioningAngle(differentiators, theirWeaknesses, theirName, ourName, contextLabel);
+  // Rank all battlecard lists by relevance to the persona/company context
+  const keywords        = getContextKeywords(`${contextLabel} ${contextDetails}`);
+  const ourName         = yourCompany.company_name || "Us";
+  const theirName       = competitor.company_name  || "Competitor";
+  const differentiators = rankByContext(competitor.how_we_win         || [], keywords);
+  const landmines       = rankByContext(competitor.potential_landmines || [], keywords);
+  const theirWeaknesses = rankByContext(competitor.weaknesses          || [], keywords);
+  const theirPricing    = competitor.pricing   || [];
+  const ourPricing      = yourCompany.pricing  || [];
 
-  // Opening hook: first differentiator turned into an opening question
-  const openingHook = differentiators[0]
-    ? differentiatorToQuestion(differentiators[0], theirName)
-    : `What's the biggest gap you've found with ${theirName}?`;
+  const positioningAngle   = buildPositioningAngle(differentiators, theirWeaknesses, theirName, ourName, contextLabel, contextDetails, isB2C);
+  const openingHook        = buildOpeningHook(theirName, contextLabel, contextDetails, isB2C);
+  const leadWith           = buildLeadWiths(differentiators, contextLabel, contextDetails, isB2C);
+  const watchOutFor        = buildWatchOutFor(landmines, differentiators, contextLabel, contextDetails, isB2C);
+  const rawQuestions       = differentiators.slice(0, 4)
+    .map(d => differentiatorToQuestion(d, theirName, contextLabel, contextDetails, isB2C));
+  const discoveryQuestions = [...new Set(rawQuestions)];
+  const pricingFrame       = buildPricingNarrative(theirPricing, ourPricing, theirName, ourName, contextLabel, contextDetails, isB2C);
 
-  // Lead-withs: all differentiators as bullet points for the opener
-  const leadWith = differentiators;
-
-  // Watch Out For: each landmine paired with a counter from differentiators
-  const watchOutFor = landmines.map((landmine, i) => ({
-    landmine,
-    counter: differentiators[i % Math.max(differentiators.length, 1)] ||
-             `Focus on ${ourName}'s core differentiators to counter this.`
-  }));
-
-  // Discovery questions: each differentiator → qualifying question
-  const discoveryQuestions = differentiators.slice(0, 4).map(d => differentiatorToQuestion(d, theirName));
-
-  // Pricing narrative
-  const pricingFrame = buildPricingNarrative(theirPricing, ourPricing, theirName, ourName);
-
-  return {
-    competitorName: theirName,
-    yourName: ourName,
-    contextLabel,
-    contextDetails,
-    isB2C,
-    positioningAngle,
-    openingHook,
-    leadWith,
-    watchOutFor,
-    discoveryQuestions: [...new Set(discoveryQuestions)], // deduplicate
-    pricingFrame,
-    theirWeaknesses,
-  };
+  return { competitorName: theirName, yourName: ourName, contextLabel, contextDetails, isB2C,
+           positioningAngle, openingHook, leadWith, watchOutFor, discoveryQuestions, pricingFrame, theirWeaknesses };
 };
 
 // Render the cheat-sheet playbook
