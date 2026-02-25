@@ -816,6 +816,9 @@ const renderBattlecards = (data, companyUrl = null) => {
     
     // Show PDF download button
     toggleClass(selectors.pdfDownloadContainer, "hidden", false);
+
+    // Initialize Next Steps section for sales playbook generation
+    initializeNextSteps(currentBattlecard);
   }
 };
 
@@ -1032,6 +1035,233 @@ if (selectors.urlInput) {
     }, 200);
   });
 }
+
+// ====== NEXT STEPS / SALES PLAYBOOK SECTION ======
+
+const initializeNextSteps = (battlecard) => {
+  if (!battlecard || !battlecard.competitors || battlecard.competitors.length === 0) return;
+
+  const nextStepsContainer = document.getElementById("next-steps-container");
+  const competitorSelect = document.getElementById("playbook-competitor-select");
+  const generateBtn = document.getElementById("generate-playbook-btn");
+
+  if (!nextStepsContainer || !competitorSelect || !generateBtn) return;
+
+  // Populate competitor dropdown
+  battlecard.competitors.forEach((competitor, index) => {
+    const option = document.createElement("option");
+    option.value = competitor.company_name || `Competitor ${index + 1}`;
+    option.textContent = competitor.company_name || `Competitor ${index + 1}`;
+    competitorSelect.appendChild(option);
+  });
+
+  // Show next steps container
+  toggleClass(nextStepsContainer, "hidden", false);
+
+  // Set up generate button handler
+  generateBtn.addEventListener("click", async () => {
+    const targetUrl = document.getElementById("playbook-target-url")?.value?.trim() || "";
+    const targetContext = document.getElementById("playbook-target-context")?.value?.trim() || "";
+    const selectedCompetitorName = competitorSelect.value;
+
+    if (!selectedCompetitorName) {
+      alert("Please select a competitor");
+      return;
+    }
+
+    if (!targetUrl && !targetContext) {
+      alert("Please enter a target company URL or context");
+      return;
+    }
+
+    generateBtn.disabled = true;
+    const originalText = generateBtn.innerHTML;
+    generateBtn.innerHTML = `<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg> Generating...`;
+
+    try {
+      await generateSalesPlaybook(
+        { url: targetUrl, context: targetContext },
+        selectedCompetitorName,
+        battlecard
+      );
+    } finally {
+      generateBtn.disabled = false;
+      generateBtn.innerHTML = originalText;
+    }
+  });
+};
+
+const generateSalesPlaybook = async (targetCompany, selectedCompetitorName, battlecard) => {
+  const resultsContainer = document.getElementById("playbook-results");
+  if (!resultsContainer) return;
+
+  try {
+    // Find the selected competitor in battlecard
+    const competitor = battlecard.competitors.find(c => c.company_name === selectedCompetitorName);
+    if (!competitor) {
+      alert("Competitor not found");
+      return;
+    }
+
+    // Call backend to generate playbook
+    const response = await fetch(`${BACKEND_BASE_URL}/next-steps`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        target_company: {
+          url: targetCompany.url,
+          context: targetCompany.context
+        },
+        competitor: competitor,
+        your_company: {
+          name: battlecard.target_company?.company_name || "Our Company",
+          how_we_win: battlecard.target_company?.how_we_win || [],
+          pricing: battlecard.target_company?.pricing || []
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || `Failed to generate playbook (${response.status})`);
+    }
+
+    const data = await response.json();
+    renderSalesPlaybook(data, resultsContainer);
+  } catch (error) {
+    console.error("Error generating sales playbook:", error);
+    resultsContainer.innerHTML = `<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><strong>Error:</strong> ${error.message}</div>`;
+    toggleClass(resultsContainer, "hidden", false);
+  }
+};
+
+const renderSalesPlaybook = (data, container) => {
+  container.innerHTML = "";
+
+  // Create collapsible sections for each part of the playbook
+  const sections = [];
+
+  // Objection Handling Section
+  if (data.objection_handling?.common_objections) {
+    const objectionSection = document.createElement("details");
+    objectionSection.className = "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm shadow-md overflow-hidden mb-4";
+    objectionSection.open = true;
+
+    const summary = document.createElement("summary");
+    summary.className = "flex items-center justify-between px-6 py-4 cursor-pointer select-none list-none font-semibold text-slate-700 hover:bg-slate-50 transition-colors";
+    summary.innerHTML = `<span class="flex items-center gap-2">🎯 Objection Handling (${data.objection_handling.common_objections.length} objections)</span>`;
+
+    const content = document.createElement("div");
+    content.className = "px-6 pb-6 pt-1 space-y-4";
+
+    data.objection_handling.common_objections.forEach((obj, idx) => {
+      const objDiv = document.createElement("div");
+      objDiv.className = "pb-4 border-b border-slate-200 last:border-0";
+
+      let objContent = `<div class="font-medium text-slate-700 mb-2">❓ ${obj.objection}</div>`;
+      objContent += `<div class="text-xs text-slate-500 mb-2">Category: ${obj.objection_category}</div>`;
+
+      if (obj.responses && obj.responses.length > 0) {
+        objContent += `<div class="space-y-2 mb-2">`;
+        obj.responses.forEach((resp, respIdx) => {
+          objContent += `<div class="text-sm bg-indigo-50 rounded p-2 border-l-2 border-indigo-300">
+            <span class="font-semibold text-indigo-700">${resp.framework}:</span>
+            <p class="text-slate-600 mt-1">${resp.response}</p>
+          </div>`;
+        });
+        objContent += `</div>`;
+      }
+
+      if (obj.success_rate_note) {
+        objContent += `<div class="text-xs text-emerald-600">✓ ${obj.success_rate_note}</div>`;
+      }
+
+      objDiv.innerHTML = objContent;
+      content.appendChild(objDiv);
+    });
+
+    // Add ROI Calculator if available
+    if (data.objection_handling.roi_calculator) {
+      const roiDiv = document.createElement("div");
+      roiDiv.className = "mt-4 pt-4 border-t border-slate-200";
+      roiDiv.innerHTML = `
+        <div class="font-medium text-slate-700 mb-2">💰 ROI Calculator</div>
+        <div class="text-sm space-y-1 bg-emerald-50 rounded p-3">
+          <div><span class="font-medium">Current State Cost:</span> ${data.objection_handling.roi_calculator.current_state_cost}</div>
+          <div><span class="font-medium">Future Savings:</span> ${data.objection_handling.roi_calculator.future_state_savings}</div>
+          <div><span class="font-medium">Cost of Delay:</span> ${data.objection_handling.roi_calculator.cost_of_delay}</div>
+        </div>
+      `;
+      content.appendChild(roiDiv);
+    }
+
+    objectionSection.appendChild(summary);
+    objectionSection.appendChild(content);
+    sections.push(objectionSection);
+  }
+
+  // Competitive Narrative Section
+  if (data.competitive_narrative) {
+    const narrativeSection = document.createElement("details");
+    narrativeSection.className = "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm shadow-md overflow-hidden mb-4";
+    narrativeSection.open = true;
+
+    const summary = document.createElement("summary");
+    summary.className = "flex items-center justify-between px-6 py-4 cursor-pointer select-none list-none font-semibold text-slate-700 hover:bg-slate-50 transition-colors";
+    summary.innerHTML = `<span class="flex items-center gap-2">📖 Competitive Narrative</span>`;
+
+    const content = document.createElement("div");
+    content.className = "px-6 pb-6 pt-1 space-y-4";
+
+    if (data.competitive_narrative.positioning_angle) {
+      const angleDiv = document.createElement("div");
+      angleDiv.className = "pb-4 border-b border-slate-200";
+      angleDiv.innerHTML = `
+        <div class="font-medium text-slate-700 mb-2">🎯 Positioning Angle</div>
+        <p class="text-sm text-slate-600">${data.competitive_narrative.positioning_angle}</p>
+      `;
+      content.appendChild(angleDiv);
+    }
+
+    if (data.competitive_narrative.buyer_aligned_story) {
+      const storyDiv = document.createElement("div");
+      storyDiv.className = "pb-4 border-b border-slate-200";
+      storyDiv.innerHTML = `
+        <div class="font-medium text-slate-700 mb-2">💬 Buyer-Aligned Story</div>
+        <p class="text-sm text-slate-600">${data.competitive_narrative.buyer_aligned_story}</p>
+      `;
+      content.appendChild(storyDiv);
+    }
+
+    // Persona-specific narratives
+    if (data.competitive_narrative.personas && data.competitive_narrative.personas.length > 0) {
+      const personasDiv = document.createElement("div");
+      personasDiv.className = "pb-4 border-b border-slate-200";
+      personasDiv.innerHTML = `<div class="font-medium text-slate-700 mb-3">👥 By Stakeholder Type</div>`;
+
+      data.competitive_narrative.personas.forEach(persona => {
+        const personaDiv = document.createElement("div");
+        personaDiv.className = "mb-3 p-3 rounded bg-slate-50 border-l-2 border-slate-300";
+        personaDiv.innerHTML = `
+          <div class="font-semibold text-slate-700">${persona.persona}</div>
+          <p class="text-sm text-slate-600 mt-1">${persona.narrative}</p>
+          ${persona.key_points ? `<div class="text-xs text-slate-500 mt-2"><strong>Key points:</strong> ${persona.key_points.join(", ")}</div>` : ""}
+        `;
+        personasDiv.appendChild(personaDiv);
+      });
+
+      content.appendChild(personasDiv);
+    }
+
+    narrativeSection.appendChild(summary);
+    narrativeSection.appendChild(content);
+    sections.push(narrativeSection);
+  }
+
+  // Add all sections to container
+  sections.forEach(section => container.appendChild(section));
+  toggleClass(container, "hidden", false);
+};
 
 if (selectors.form) {
   selectors.form.addEventListener("submit", handleSubmit);

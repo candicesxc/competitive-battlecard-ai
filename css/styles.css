@@ -253,3 +253,13 @@ details[open] .details-chevron {
 details summary::-webkit-details-marker {
   display: none;
 }
+
+/* Sales Playbook Styling */
+#next-steps-container {
+  border-top: 2px solid rgba(99, 102, 241, 0.15);
+  padding-top: 1.5rem;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
