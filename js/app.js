@@ -102,6 +102,8 @@ const selectors = {
   savedBattlecardsList: document.getElementById("saved-battlecards-list"),
   pdfDownloadContainer: document.getElementById("pdf-download-container"),
   downloadPdfBtn: document.getElementById("download-pdf-btn"),
+  downloadPdfBtnSidebar: document.getElementById("download-pdf-btn-sidebar"),
+  expandPlaybookBtnSidebar: document.getElementById("expand-playbook-btn-sidebar"),
 };
 
 const isValidUrl = (value) => {
@@ -876,45 +878,49 @@ const createNewCompetitorCard = (competitor, index) => {
   const threatLevel = calculateThreatLevel(competitor);
   const threatLevelClass = threatLevel.toLowerCase();
 
-  // Card header with logo, name, metrics, and threat level
+  // Card header with name, company details, and threat level
   const header = document.createElement("div");
   header.className = "competitor-card-header";
 
   const info = document.createElement("div");
   info.className = "competitor-card-info";
 
-  // Logo placeholder or actual logo if available
-  const logo = document.createElement("div");
-  logo.className = "competitor-logo";
-  if (competitor.logo_url) {
-    logo.style.backgroundImage = `url(${competitor.logo_url})`;
-    logo.style.backgroundSize = "contain";
-    logo.style.backgroundPosition = "center";
-  } else {
-    logo.textContent = (competitor.company_name || "C").substring(0, 2).toUpperCase();
-  }
-  info.appendChild(logo);
-
-  // Name and metrics
+  // Name and details (no logo box)
   const details = document.createElement("div");
   const nameEl = document.createElement("div");
   nameEl.className = "competitor-name";
   nameEl.textContent = competitor.company_name || `Competitor ${index + 1}`;
   details.appendChild(nameEl);
 
-  // Only show metrics if they exist in the actual data
+  // Add company URL if available
+  if (competitor.website || competitor.company_url) {
+    const urlEl = document.createElement("div");
+    urlEl.className = "competitor-url";
+    urlEl.textContent = competitor.website || competitor.company_url;
+    details.appendChild(urlEl);
+  }
+
+  // Add brief description if available
+  if (competitor.description) {
+    const descEl = document.createElement("div");
+    descEl.className = "competitor-description";
+    descEl.textContent = competitor.description;
+    details.appendChild(descEl);
+  }
+
+  // Show adjacent competitor and similar metrics
   const metricsDiv = document.createElement("div");
   metricsDiv.className = "competitor-metrics";
 
   const realMetrics = [];
+  if (competitor.adjacent_competitor !== undefined) {
+    realMetrics.push({ label: "Adjacent Competitor", value: competitor.adjacent_competitor ? "Yes" : "No" });
+  }
+  if (competitor.is_similar !== undefined) {
+    realMetrics.push({ label: "Similar", value: competitor.is_similar ? "Yes" : "No" });
+  }
   if (competitor.similarity_score) {
     realMetrics.push({ label: "Similarity", value: `${competitor.similarity_score}%` });
-  }
-  if (competitor.competitive_score) {
-    realMetrics.push({ label: "Threat Score", value: `${competitor.competitive_score}/10` });
-  }
-  if (competitor.score_vs_target) {
-    realMetrics.push({ label: "Competition", value: `${competitor.score_vs_target}/10` });
   }
 
   if (realMetrics.length > 0) {
@@ -1364,6 +1370,16 @@ const initializeNextSteps = (battlecard) => {
     expandPlaybookBtn.dataset.initialized = "true";
   }
 
+  // Set up expand button handler for sidebar button
+  const expandPlaybookBtnSidebar = document.getElementById("expand-playbook-btn-sidebar");
+  if (expandPlaybookBtnSidebar && !expandPlaybookBtnSidebar.dataset.initialized) {
+    expandPlaybookBtnSidebar.addEventListener("click", () => {
+      nextStepsContainer.classList.remove("hidden");
+      expandPlaybookBtn.classList.add("hidden");
+    });
+    expandPlaybookBtnSidebar.dataset.initialized = "true";
+  }
+
   // Set up collapse button handler
   if (collapseBtn && !collapseBtn.dataset.initialized) {
     collapseBtn.addEventListener("click", () => {
@@ -1682,6 +1698,9 @@ if (document.readyState === 'loading') {
 // Set up PDF download button
 if (selectors.downloadPdfBtn) {
   selectors.downloadPdfBtn.addEventListener("click", handlePdfDownload);
+  if (selectors.downloadPdfBtnSidebar) {
+    selectors.downloadPdfBtnSidebar.addEventListener("click", handlePdfDownload);
+  }
 }
 
 
