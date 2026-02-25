@@ -756,44 +756,65 @@ const renderBattlecards = (data, companyUrl = null) => {
 
   if (!resultsSection || !targetHeader || !competitorsList || !scrollContainer) return;
 
-  // Render target company header + profile card
+  // Render simple header: just "Battlecard for [company]"
   const target = data.target_company ?? {};
-  targetHeader.innerHTML = `
-    <h1 class="text-3xl font-bold text-white">${target.company_name || "Target Company"}</h1>
-    ${target.website ? `<p class="text-sm text-slate-400">${target.website}</p>` : ""}
-    ${data.market_summary ? `<div class="market-snapshot-section mt-4">${data.market_summary}</div>` : ""}
-  `;
+  targetHeader.textContent = `Battlecard for ${target.company_name || "Company"}`;
 
-  // Render the target company profile card (overview/products/strengths/weaknesses/pricing)
-  const targetProfileEl = document.getElementById("target-company-profile");
-  if (targetProfileEl) {
-    targetProfileEl.innerHTML = "";
-    if (target.overview || target.products?.length || target.strengths?.length || target.weaknesses?.length || target.pricing?.length) {
-      const profileCard = document.createElement("div");
-      profileCard.className = "competitor-card mb-8";
-      profileCard.innerHTML = `<div class="competitor-card-header"><div class="competitor-card-info"><div class="competitor-name">${target.company_name || "Your Company"} — Profile</div></div></div>`;
+  // Extract market category from market summary (first few words)
+  const marketCategory = document.getElementById("market-category");
+  if (marketCategory && data.market_summary) {
+    const firstWords = data.market_summary.split(/[\s,]+/).slice(0, 2).join(" ").replace(/[.,]$/, "");
+    marketCategory.textContent = firstWords || "Market Overview";
+  }
 
-      if (target.overview) {
-        const ov = document.createElement("div");
-        ov.className = "section-block mt-4";
-        ov.innerHTML = `<div class="section-title mb-2">📋 Overview</div><div class="overview-text">${target.overview}</div>`;
-        profileCard.appendChild(ov);
-      }
-      if (target.products?.length) profileCard.appendChild(createSectionBlock("📦 Products", target.products, "", true));
+  // Render Market Overview in tab
+  const marketOverviewContent = document.getElementById("market-overview-content");
+  if (marketOverviewContent) {
+    marketOverviewContent.innerHTML = data.market_summary ? `<p class="leading-relaxed">${data.market_summary}</p>` : "<p class=\"text-slate-500\">No market summary available.</p>";
+  }
 
-      const swWrap = document.createElement("div");
-      swWrap.className = "competitor-sections";
-      const tLeft = document.createElement("div"); tLeft.className = "space-y-4";
-      const tRight = document.createElement("div"); tRight.className = "space-y-4";
-      if (target.strengths?.length) tLeft.appendChild(createSectionBlock("💪 Strengths", target.strengths));
-      if (target.weaknesses?.length) tRight.appendChild(createSectionBlock("⚠️ Weaknesses", target.weaknesses, "weakness"));
-      if (tLeft.children.length || tRight.children.length) {
-        swWrap.appendChild(tLeft); swWrap.appendChild(tRight);
-        profileCard.appendChild(swWrap);
-      }
-      if (target.pricing?.length) profileCard.appendChild(createPricingSection(target.pricing));
-      targetProfileEl.appendChild(profileCard);
+  // Render Target Company Profile in tab
+  const targetProfileContent = document.getElementById("target-profile-content");
+  if (targetProfileContent && (target.overview || target.products?.length || target.strengths?.length || target.weaknesses?.length || target.pricing?.length)) {
+    targetProfileContent.innerHTML = "";
+    const profileDiv = document.createElement("div");
+    profileDiv.className = "space-y-4";
+
+    if (target.overview) {
+      const ovDiv = document.createElement("div");
+      ovDiv.innerHTML = `<div class="font-semibold text-slate-100 mb-1">Overview</div><p class="text-sm text-slate-400 leading-relaxed">${target.overview}</p>`;
+      profileDiv.appendChild(ovDiv);
     }
+
+    if (target.strengths?.length) {
+      const strDiv = document.createElement("div");
+      strDiv.innerHTML = `<div class="font-semibold text-slate-100 mb-2">💪 Strengths</div><ul class="text-sm text-slate-300 space-y-1 list-disc list-inside">` +
+        target.strengths.map(s => `<li>${s}</li>`).join("") + `</ul>`;
+      profileDiv.appendChild(strDiv);
+    }
+
+    if (target.weaknesses?.length) {
+      const weakDiv = document.createElement("div");
+      weakDiv.innerHTML = `<div class="font-semibold text-slate-100 mb-2">⚠️ Weaknesses</div><ul class="text-sm text-slate-300 space-y-1 list-disc list-inside">` +
+        target.weaknesses.map(w => `<li>${w}</li>`).join("") + `</ul>`;
+      profileDiv.appendChild(weakDiv);
+    }
+
+    if (target.products?.length) {
+      const prodDiv = document.createElement("div");
+      prodDiv.innerHTML = `<div class="font-semibold text-slate-100 mb-2">📦 Products</div><ul class="text-sm text-slate-300 space-y-1 list-disc list-inside">` +
+        target.products.map(p => `<li>${p}</li>`).join("") + `</ul>`;
+      profileDiv.appendChild(prodDiv);
+    }
+
+    if (target.pricing?.length) {
+      const pricingDiv = document.createElement("div");
+      pricingDiv.innerHTML = `<div class="font-semibold text-slate-100 mb-2">💰 Pricing</div><ul class="text-sm text-slate-300 space-y-1 list-disc list-inside">` +
+        target.pricing.map(pr => `<li>${pr}</li>`).join("") + `</ul>`;
+      profileDiv.appendChild(pricingDiv);
+    }
+
+    targetProfileContent.appendChild(profileDiv);
   }
 
   // Render competitors list in sidebar
@@ -1693,6 +1714,36 @@ if (selectors.downloadPdfBtnSidebar) {
   selectors.downloadPdfBtnSidebar.addEventListener("click", handlePdfDownload);
 }
 
+// Set up tab switching for Market Overview / Target Profile
+const tabMarketBtn = document.getElementById("tab-market-overview");
+const tabTargetBtn = document.getElementById("tab-target-profile");
+const marketContent = document.getElementById("market-overview-content");
+const targetContent = document.getElementById("target-profile-content");
+
+if (tabMarketBtn && tabTargetBtn && marketContent && targetContent) {
+  const switchTab = (tabName) => {
+    if (tabName === "market-overview") {
+      marketContent.classList.remove("hidden");
+      targetContent.classList.add("hidden");
+      tabMarketBtn.classList.add("active-tab");
+      tabTargetBtn.classList.remove("active-tab");
+      // Update button styling
+      tabMarketBtn.className = "px-3 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700 hover:border-slate-600 hover:bg-slate-700/50 transition-all active-tab";
+      tabTargetBtn.className = "px-3 py-2 text-sm font-medium text-slate-400 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-slate-600 hover:bg-slate-700/50 transition-all";
+    } else {
+      marketContent.classList.add("hidden");
+      targetContent.classList.remove("hidden");
+      tabMarketBtn.classList.remove("active-tab");
+      tabTargetBtn.classList.add("active-tab");
+      // Update button styling
+      tabMarketBtn.className = "px-3 py-2 text-sm font-medium text-slate-400 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-slate-600 hover:bg-slate-700/50 transition-all";
+      tabTargetBtn.className = "px-3 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700 hover:border-slate-600 hover:bg-slate-700/50 transition-all active-tab";
+    }
+  };
+
+  tabMarketBtn.addEventListener("click", () => switchTab("market-overview"));
+  tabTargetBtn.addEventListener("click", () => switchTab("target-profile"));
+}
 
 window.renderBattlecards = renderBattlecards;
 
