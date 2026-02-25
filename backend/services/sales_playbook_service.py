@@ -22,7 +22,7 @@ class SalesPlaybookService:
                 competitor, your_company, target_company, context
             )
 
-            response = openai_client.chat.completions.create(
+            response = await openai_client.chat.completions.create(
                 model="gpt-4",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,

@@ -372,39 +372,6 @@ const createSection = (title, items, accentClass) => {
 };
 
 // Pricing section with boxes around sections
-const createPricingSection = (title, items, accentClass) => {
-  const section = document.createElement("div");
-  section.className =
-    "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md transition-all duration-200 hover:shadow-lg col-span-full";
-
-  const heading = document.createElement("h3");
-  heading.className = `section-title mb-3 ${accentClass}`;
-  heading.textContent = title;
-  section.appendChild(heading);
-
-  if (!items || items.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "text-sm text-slate-400 italic";
-    empty.textContent = "No data available.";
-    section.appendChild(empty);
-    return section;
-  }
-
-  // Create a single column layout for pricing (full width)
-  const list = document.createElement("ul");
-  list.className = "space-y-2.5 text-sm leading-relaxed text-slate-700 list-none";
-
-  items.forEach((item) => {
-    const li = document.createElement("li");
-    li.className = "flex items-start gap-2.5 before:content-['•'] before:text-indigo-500 before:font-bold before:flex-shrink-0 before:mt-0.5";
-    li.textContent = item;
-    list.appendChild(li);
-  });
-
-  section.appendChild(list);
-  return section;
-};
-
 // createScoreBar function removed - competitive score no longer displayed in UI
 
 // Filter out irrelevant news (listicles, comparison articles, etc.)
@@ -935,26 +902,33 @@ const createNewCompetitorCard = (competitor, index) => {
   nameEl.textContent = competitor.company_name || `Competitor ${index + 1}`;
   details.appendChild(nameEl);
 
+  // Only show metrics if they exist in the actual data
   const metricsDiv = document.createElement("div");
   metricsDiv.className = "competitor-metrics";
 
-  // Sample metrics (can be enhanced with real data)
-  const metrics = [
-    { label: "Win Rate", value: `${Math.floor(Math.random() * 40 + 40)}%` },
-    { label: "F500 Usage", value: `${Math.floor(Math.random() * 40 + 40)}%` },
-    { label: "Market Share", value: `${Math.floor(Math.random() * 30 + 10)}%` }
-  ];
+  const realMetrics = [];
+  if (competitor.similarity_score) {
+    realMetrics.push({ label: "Similarity", value: `${competitor.similarity_score}%` });
+  }
+  if (competitor.competitive_score) {
+    realMetrics.push({ label: "Threat Score", value: `${competitor.competitive_score}/10` });
+  }
+  if (competitor.score_vs_target) {
+    realMetrics.push({ label: "Competition", value: `${competitor.score_vs_target}/10` });
+  }
 
-  metrics.forEach(metric => {
-    const metricDiv = document.createElement("div");
-    metricDiv.className = "metric";
-    metricDiv.innerHTML = `
-      <span class="metric-label">${metric.label}</span>
-      <span class="metric-value">${metric.value}</span>
-    `;
-    metricsDiv.appendChild(metricDiv);
-  });
-  details.appendChild(metricsDiv);
+  if (realMetrics.length > 0) {
+    realMetrics.forEach(metric => {
+      const metricDiv = document.createElement("div");
+      metricDiv.className = "metric";
+      metricDiv.innerHTML = `
+        <span class="metric-label">${metric.label}</span>
+        <span class="metric-value">${metric.value}</span>
+      `;
+      metricsDiv.appendChild(metricDiv);
+    });
+    details.appendChild(metricsDiv);
+  }
   info.appendChild(details);
   header.appendChild(info);
 

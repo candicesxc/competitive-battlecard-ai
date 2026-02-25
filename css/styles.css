@@ -16,9 +16,9 @@ body {
   color: #e2e8f0;
 }
 
-/* Light theme section (header) */
+/* Dark theme section (header) */
 section:first-of-type {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 }
 
 .loader {
