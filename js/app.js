@@ -1042,13 +1042,34 @@ if (selectors.urlInput) {
 // ====== NEXT STEPS / SALES PLAYBOOK SECTION ======
 
 const initializeNextSteps = (battlecard) => {
-  if (!battlecard || !battlecard.competitors || battlecard.competitors.length === 0) return;
+  if (!battlecard || !battlecard.competitors || battlecard.competitors.length === 0) {
+    console.log("initializeNextSteps: No competitors found");
+    return;
+  }
 
   const nextStepsContainer = document.getElementById("next-steps-container");
   const competitorSelect = document.getElementById("playbook-competitor-select");
   const generateBtn = document.getElementById("generate-playbook-btn");
 
-  if (!nextStepsContainer || !competitorSelect || !generateBtn) return;
+  if (!nextStepsContainer) {
+    console.error("nextStepsContainer not found");
+    return;
+  }
+  if (!competitorSelect) {
+    console.error("competitorSelect not found");
+    return;
+  }
+  if (!generateBtn) {
+    console.error("generateBtn not found");
+    return;
+  }
+
+  console.log("Initializing next steps with", battlecard.competitors.length, "competitors");
+
+  // Clear any existing options (except the first two)
+  while (competitorSelect.options.length > 2) {
+    competitorSelect.removeChild(competitorSelect.lastChild);
+  }
 
   // Populate competitor dropdown
   battlecard.competitors.forEach((competitor, index) => {
@@ -1058,40 +1079,35 @@ const initializeNextSteps = (battlecard) => {
     competitorSelect.appendChild(option);
   });
 
-  // Show next steps container
-  toggleClass(nextStepsContainer, "hidden", false);
+  // Show next steps container - make sure it's visible
+  nextStepsContainer.classList.remove("hidden");
+  console.log("Next steps container shown");
 
-  // Set up generate button handler
-  generateBtn.addEventListener("click", async () => {
-    const targetUrl = document.getElementById("playbook-target-url")?.value?.trim() || "";
-    const targetContext = document.getElementById("playbook-target-context")?.value?.trim() || "";
-    const selectedCompetitorName = competitorSelect.value;
+  // Set up generate button handler (only once to avoid duplicate handlers)
+  if (!generateBtn.dataset.initialized) {
+    generateBtn.addEventListener("click", async () => {
+      const targetUrl = document.getElementById("playbook-target-url")?.value?.trim() || "";
+      const targetContext = document.getElementById("playbook-target-context")?.value?.trim() || "";
+      const selectedCompetitorName = competitorSelect.value;
 
-    if (!selectedCompetitorName) {
-      alert("Please select a competitor");
-      return;
-    }
+      if (!selectedCompetitorName || selectedCompetitorName === "" || selectedCompetitorName === "all") {
+        alert("Please select a competitor");
+        return;
+      }
 
-    if (!targetUrl && !targetContext) {
-      alert("Please enter a target company URL or context");
-      return;
-    }
+      if (!targetUrl && !targetContext) {
+        alert("Please enter a target company URL or context");
+        return;
+      }
 
-    generateBtn.disabled = true;
-    const originalText = generateBtn.innerHTML;
-    generateBtn.innerHTML = `<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg> Generating...`;
-
-    try {
       await generateSalesPlaybook(
         { url: targetUrl, context: targetContext },
         selectedCompetitorName,
         battlecard
       );
-    } finally {
-      generateBtn.disabled = false;
-      generateBtn.innerHTML = originalText;
-    }
-  });
+    });
+    generateBtn.dataset.initialized = "true";
+  }
 };
 
 const generateSalesPlaybook = async (targetCompany, selectedCompetitorName, battlecard) => {
