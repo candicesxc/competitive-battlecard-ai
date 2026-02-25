@@ -837,6 +837,11 @@ const renderBattlecards = (data, companyUrl = null) => {
   resultsSection.classList.remove("hidden");
   toggleClass(resultsSection, "hidden", false);
 
+  // Show PDF download button
+  if (selectors.pdfDownloadContainer) {
+    toggleClass(selectors.pdfDownloadContainer, "hidden", false);
+  }
+
   // Show next steps section
   if (nextStepsSection) {
     nextStepsSection.classList.remove("hidden");
