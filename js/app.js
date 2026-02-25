@@ -383,19 +383,7 @@ const createTargetCard = (target, marketSummary) => {
   // Removed border, rounded corners, background gradient, and shadow for cleaner look
   section.className = "space-y-12 py-6";
 
-  // Market snapshot as its own clearly separate section with proper heading
-  if (marketSummary) {
-    const marketSection = document.createElement("div");
-    marketSection.className = "market-snapshot-section mb-12";
-    const heading = document.createElement("h2");
-    heading.className = "text-2xl font-semibold text-blue-800 mb-4";
-    heading.textContent = "Market snapshot";
-    const body = document.createElement("p");
-    body.className = "mt-2 text-base leading-7 text-slate-800 font-medium";
-    body.textContent = marketSummary;
-    marketSection.append(heading, body);
-    section.appendChild(marketSection);
-  }
+  // Market snapshot moved to sidebar tabs — not rendered in main content
 
   // Company header
   const header = document.createElement("header");
@@ -760,11 +748,17 @@ const renderBattlecards = (data, companyUrl = null) => {
   const target = data.target_company ?? {};
   targetHeader.textContent = `Battlecard for ${target.company_name || "Company"}`;
 
-  // Extract market category from market summary (first few words)
+  // Set market tab label to first 1-2 words of market summary (e.g. "Cybersecurity")
   const marketCategory = document.getElementById("market-category");
   if (marketCategory && data.market_summary) {
     const firstWords = data.market_summary.split(/[\s,]+/).slice(0, 2).join(" ").replace(/[.,]$/, "");
-    marketCategory.textContent = firstWords || "Market Overview";
+    marketCategory.textContent = firstWords || "Market";
+  }
+
+  // Set company tab label to target company name
+  const companyTabLabel = document.getElementById("company-tab-label");
+  if (companyTabLabel) {
+    companyTabLabel.textContent = target.company_name || "Company";
   }
 
   // Render Market Overview
@@ -1693,25 +1687,46 @@ if (selectors.downloadPdfBtnSidebar) {
   selectors.downloadPdfBtnSidebar.addEventListener("click", handlePdfDownload);
 }
 
-// Set up collapsible market section toggle
-const toggleMarketBtn = document.getElementById("toggle-market-section");
-const marketSectionContent = document.getElementById("market-section-content");
-const marketToggleIcon = document.getElementById("market-toggle-icon");
+// Set up sidebar tab switching: Market Overview / Company Overview
+const sidebarTabBtns = document.querySelectorAll(".sidebar-tab-btn");
+const sidebarTabPanel = document.getElementById("sidebar-tab-panel");
+const marketOverviewPanel = document.getElementById("market-overview-content");
+const companyOverviewPanel = document.getElementById("target-profile-content");
 
-if (toggleMarketBtn && marketSectionContent) {
-  toggleMarketBtn.addEventListener("click", () => {
-    const isHidden = marketSectionContent.classList.contains("hidden");
-    if (isHidden) {
-      marketSectionContent.classList.remove("hidden");
-      marketSectionContent.style.maxHeight = "none";
-      marketToggleIcon.style.transform = "rotate(180deg)";
-    } else {
-      marketSectionContent.classList.add("hidden");
-      marketSectionContent.style.maxHeight = "0";
-      marketToggleIcon.style.transform = "rotate(0deg)";
+let activeTab = "market"; // start with market tab "active" (highlighted) but panel hidden
+
+sidebarTabBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    const tab = btn.dataset.tab;
+    const panelIsOpen = !sidebarTabPanel.classList.contains("hidden");
+    const isSameTab = tab === activeTab;
+
+    // If clicking the same tab while open — collapse the panel
+    if (isSameTab && panelIsOpen) {
+      sidebarTabPanel.classList.add("hidden");
+      return;
     }
+
+    // Otherwise: open panel and show correct content
+    activeTab = tab;
+    sidebarTabPanel.classList.remove("hidden");
+
+    // Switch content
+    marketOverviewPanel.classList.toggle("hidden", tab !== "market");
+    companyOverviewPanel.classList.toggle("hidden", tab !== "company");
+
+    // Update tab button styles
+    sidebarTabBtns.forEach(b => {
+      const isActive = b.dataset.tab === tab;
+      b.classList.toggle("text-slate-300", isActive);
+      b.classList.toggle("bg-slate-800/60", isActive);
+      b.classList.toggle("border-indigo-500", isActive);
+      b.classList.toggle("text-slate-500", !isActive);
+      b.classList.toggle("bg-transparent", !isActive);
+      b.classList.toggle("border-transparent", !isActive);
+    });
   });
-}
+});
 
 window.renderBattlecards = renderBattlecards;
 
