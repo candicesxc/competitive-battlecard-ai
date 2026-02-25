@@ -761,32 +761,46 @@ const renderBattlecards = (data, companyUrl = null) => {
     companyTabLabel.textContent = target.company_name || "Company";
   }
 
-  // Render Market Overview
+  // Render Market Overview (shown in right panel when nav link clicked)
   const marketOverviewContent = document.getElementById("market-overview-content");
   if (marketOverviewContent) {
-    marketOverviewContent.innerHTML = data.market_summary ? `<p class="text-xs leading-relaxed">${data.market_summary}</p>` : "<p class=\"text-slate-500 text-xs\">No market summary available.</p>";
+    marketOverviewContent.innerHTML = data.market_summary
+      ? `<p class="text-slate-300 leading-relaxed">${data.market_summary}</p>`
+      : `<p class="text-slate-500">No market summary available.</p>`;
   }
 
   // Render Target Company Profile
+  // Update company panel title and nav label
+  const companyPanelTitle = document.getElementById("company-panel-title");
+  if (companyPanelTitle) companyPanelTitle.textContent = `About ${target.company_name || "Company"}`;
+
   const targetProfileContent = document.getElementById("target-profile-content");
   if (targetProfileContent) {
-    targetProfileContent.innerHTML = "";
-    if (target.overview || target.products?.length || target.strengths?.length || target.weaknesses?.length || target.pricing?.length) {
-      let html = "";
+    const hasData = target.overview || target.products?.length || target.strengths?.length || target.weaknesses?.length || target.pricing?.length;
+    if (hasData) {
+      let html = `<div class="space-y-6">`;
       if (target.overview) {
-        html += `<div><strong class="text-slate-200">${target.company_name}</strong><p class="text-xs mt-1">${target.overview}</p></div>`;
+        html += `<p class="text-slate-300 leading-relaxed">${target.overview}</p>`;
       }
-      if (target.strengths?.length) {
-        html += `<div><strong class="text-slate-200">Strengths:</strong><ul class="text-xs space-y-0.5 mt-1">` +
-          target.strengths.slice(0, 3).map(s => `<li>• ${s}</li>`).join("") + `</ul></div>`;
-      }
-      if (target.weaknesses?.length) {
-        html += `<div><strong class="text-slate-200">Weaknesses:</strong><ul class="text-xs space-y-0.5 mt-1">` +
-          target.weaknesses.slice(0, 2).map(w => `<li>• ${w}</li>`).join("") + `</ul></div>`;
-      }
+      const sections = [
+        { label: "Products & Services", items: target.products },
+        { label: "Strengths", items: target.strengths },
+        { label: "Weaknesses", items: target.weaknesses },
+        { label: "Pricing", items: target.pricing },
+      ];
+      sections.forEach(({ label, items }) => {
+        if (items?.length) {
+          html += `<div>
+            <h3 class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">${label}</h3>
+            <ul class="space-y-1.5">` +
+            items.map(item => `<li class="flex items-start gap-2 text-slate-300"><span class="text-slate-600 mt-1">•</span><span>${item}</span></li>`).join("") +
+            `</ul></div>`;
+        }
+      });
+      html += `</div>`;
       targetProfileContent.innerHTML = html;
     } else {
-      targetProfileContent.innerHTML = `<p class="text-slate-500 text-xs">No company profile available.</p>`;
+      targetProfileContent.innerHTML = `<p class="text-slate-500">No company profile available.</p>`;
     }
   }
 
@@ -809,6 +823,9 @@ const renderBattlecards = (data, companyUrl = null) => {
         el.classList.remove("active");
       });
       item.classList.add("active");
+
+      // Ensure competitor cards are visible (hide any open panels)
+      showCompetitorCards();
 
       // Scroll to competitor card
       const card = scrollContainer.querySelector(`[data-competitor-index="${index}"]`);
@@ -1687,45 +1704,58 @@ if (selectors.downloadPdfBtnSidebar) {
   selectors.downloadPdfBtnSidebar.addEventListener("click", handlePdfDownload);
 }
 
-// Set up sidebar tab switching: Market Overview / Company Overview
-const sidebarTabBtns = document.querySelectorAll(".sidebar-tab-btn");
-const sidebarTabPanel = document.getElementById("sidebar-tab-panel");
-const marketOverviewPanel = document.getElementById("market-overview-content");
-const companyOverviewPanel = document.getElementById("target-profile-content");
+// Sidebar nav links → show/hide right-panel content
+const navLinks = document.querySelectorAll(".sidebar-nav-link");
+const competitorScrollContainer = document.getElementById("competitors-scroll-container");
 
-let activeTab = "market"; // start with market tab "active" (highlighted) but panel hidden
-
-sidebarTabBtns.forEach(btn => {
-  btn.addEventListener("click", () => {
-    const tab = btn.dataset.tab;
-    const panelIsOpen = !sidebarTabPanel.classList.contains("hidden");
-    const isSameTab = tab === activeTab;
-
-    // If clicking the same tab while open — collapse the panel
-    if (isSameTab && panelIsOpen) {
-      sidebarTabPanel.classList.add("hidden");
-      return;
-    }
-
-    // Otherwise: open panel and show correct content
-    activeTab = tab;
-    sidebarTabPanel.classList.remove("hidden");
-
-    // Switch content
-    marketOverviewPanel.classList.toggle("hidden", tab !== "market");
-    companyOverviewPanel.classList.toggle("hidden", tab !== "company");
-
-    // Update tab button styles
-    sidebarTabBtns.forEach(b => {
-      const isActive = b.dataset.tab === tab;
-      b.classList.toggle("text-slate-300", isActive);
-      b.classList.toggle("bg-slate-800/60", isActive);
-      b.classList.toggle("border-indigo-500", isActive);
-      b.classList.toggle("text-slate-500", !isActive);
-      b.classList.toggle("bg-transparent", !isActive);
-      b.classList.toggle("border-transparent", !isActive);
-    });
+function showMainPanel(panelId) {
+  // Hide all content panels and competitors
+  ["main-market-panel", "main-company-panel"].forEach(id => {
+    document.getElementById(id)?.classList.add("hidden");
   });
+  competitorScrollContainer?.classList.add("hidden");
+
+  // Show target panel
+  document.getElementById(panelId)?.classList.remove("hidden");
+
+  // Update nav link active styles
+  navLinks.forEach(l => {
+    const isActive = l.dataset.panel === panelId;
+    l.classList.toggle("text-slate-200", isActive);
+    l.classList.toggle("bg-slate-800/60", isActive);
+    l.classList.toggle("text-slate-400", !isActive);
+  });
+}
+
+function showCompetitorCards() {
+  ["main-market-panel", "main-company-panel"].forEach(id => {
+    document.getElementById(id)?.classList.add("hidden");
+  });
+  competitorScrollContainer?.classList.remove("hidden");
+
+  // Clear active state on nav links
+  navLinks.forEach(l => {
+    l.classList.remove("text-slate-200", "bg-slate-800/60");
+    l.classList.add("text-slate-400");
+  });
+}
+
+navLinks.forEach(link => {
+  link.addEventListener("click", () => {
+    const panelId = link.dataset.panel;
+    const panel = document.getElementById(panelId);
+    // Toggle: if already visible, go back to competitor cards
+    if (panel && !panel.classList.contains("hidden")) {
+      showCompetitorCards();
+    } else {
+      showMainPanel(panelId);
+    }
+  });
+});
+
+// Close (✕) buttons inside panels
+document.querySelectorAll(".panel-close-btn").forEach(btn => {
+  btn.addEventListener("click", () => showCompetitorCards());
 });
 
 window.renderBattlecards = renderBattlecards;
