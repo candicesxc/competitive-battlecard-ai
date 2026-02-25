@@ -372,39 +372,6 @@ const createSection = (title, items, accentClass) => {
 };
 
 // Pricing section with boxes around sections
-const createPricingSection = (title, items, accentClass) => {
-  const section = document.createElement("div");
-  section.className =
-    "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md transition-all duration-200 hover:shadow-lg col-span-full";
-
-  const heading = document.createElement("h3");
-  heading.className = `section-title mb-3 ${accentClass}`;
-  heading.textContent = title;
-  section.appendChild(heading);
-
-  if (!items || items.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "text-sm text-slate-400 italic";
-    empty.textContent = "No data available.";
-    section.appendChild(empty);
-    return section;
-  }
-
-  // Create a single column layout for pricing (full width)
-  const list = document.createElement("ul");
-  list.className = "space-y-2.5 text-sm leading-relaxed text-slate-700 list-none";
-
-  items.forEach((item) => {
-    const li = document.createElement("li");
-    li.className = "flex items-start gap-2.5 before:content-['•'] before:text-indigo-500 before:font-bold before:flex-shrink-0 before:mt-0.5";
-    li.textContent = item;
-    list.appendChild(li);
-  });
-
-  section.appendChild(list);
-  return section;
-};
-
 // createScoreBar function removed - competitive score no longer displayed in UI
 
 // Filter out irrelevant news (listicles, comparison articles, etc.)
