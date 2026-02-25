@@ -10,10 +10,11 @@ from fastapi.responses import JSONResponse
 
 from .config import get_settings
 from .crew_agents import BattlecardCrew
-from .models import AnalyzeRequest
+from .models import AnalyzeRequest, ResearchRequest
 from .services.analysis_service import AnalysisError
 from .services.search_service import SearchProviderError
 from .services.company_extraction import extract_company_data
+from .services.research_service import ResearchService
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -73,6 +74,29 @@ async def analyze_company(payload: AnalyzeRequest) -> JSONResponse:
     }
 
     return JSONResponse(content=response)
+
+
+@app.post("/research")
+async def research_target(payload: ResearchRequest) -> JSONResponse:
+    """Research a target company or persona to extract pain points and priorities."""
+
+    logger.info(f"Received research request for {payload.research_type}: {payload.query[:50]}")
+
+    try:
+        service = ResearchService()
+
+        if payload.research_type == "company":
+            result = await service.research_company(payload.query)
+        elif payload.research_type == "persona":
+            result = await service.research_persona(payload.query)
+        else:
+            raise ValueError(f"Unknown research type: {payload.research_type}")
+
+        return JSONResponse(content=result)
+
+    except Exception as exc:
+        logger.error(f"Error researching target: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.post("/next-steps")
