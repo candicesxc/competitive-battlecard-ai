@@ -131,6 +131,67 @@
               Download All Insights as PDF
             </button>
           </div>
+
+          <!-- Next Steps Section -->
+          <div id="next-steps-container" class="mt-8 hidden">
+            <h2 class="text-2xl font-bold text-slate-900 mb-6">Next Steps: Generate Sales Playbook</h2>
+
+            <!-- Target Company Input -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md mb-6">
+              <h3 class="text-lg font-semibold text-slate-700 mb-4">Target Company</h3>
+              <div class="space-y-3">
+                <div>
+                  <label for="playbook-target-url" class="block text-sm font-medium text-slate-700 mb-2">Company Website URL (to auto-extract context)</label>
+                  <input
+                    id="playbook-target-url"
+                    type="text"
+                    placeholder="https://targetcompany.com"
+                    class="w-full rounded-lg border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label for="playbook-target-context" class="block text-sm font-medium text-slate-700 mb-2">Optional Context (size, industry, pain points)</label>
+                  <textarea
+                    id="playbook-target-context"
+                    placeholder="e.g., Mid-market SaaS, struggling with data integration, needs faster implementation..."
+                    class="w-full rounded-lg border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 resize-none"
+                    rows="3"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Competitor Selector -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-md mb-6">
+              <h3 class="text-lg font-semibold text-slate-700 mb-4">Select Competitor</h3>
+              <div class="space-y-3">
+                <select
+                  id="playbook-competitor-select"
+                  class="w-full rounded-lg border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                >
+                  <option value="">-- Choose a competitor --</option>
+                  <option value="all">Generate for All Competitors</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Generate Button -->
+            <div class="text-center">
+              <button
+                id="generate-playbook-btn"
+                type="button"
+                class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-indigo-700 hover:shadow-lg hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+                Generate Sales Playbook
+              </button>
+            </div>
+
+            <!-- Results Container -->
+            <div id="playbook-results" class="mt-8 hidden"></div>
+          </div>
         </div>
       </section>
 
