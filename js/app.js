@@ -756,43 +756,43 @@ const renderBattlecards = (data, companyUrl = null) => {
 
   if (!resultsSection || !targetHeader || !competitorsList || !scrollContainer) return;
 
-  // Render target company header + profile card
+  // Render simple header: just "Battlecard for [company]"
   const target = data.target_company ?? {};
-  targetHeader.innerHTML = `
-    <h1 class="text-3xl font-bold text-white">${target.company_name || "Target Company"}</h1>
-    ${target.website ? `<p class="text-sm text-slate-400">${target.website}</p>` : ""}
-    ${data.market_summary ? `<div class="market-snapshot-section mt-4">${data.market_summary}</div>` : ""}
-  `;
+  targetHeader.textContent = `Battlecard for ${target.company_name || "Company"}`;
 
-  // Render the target company profile card (overview/products/strengths/weaknesses/pricing)
-  const targetProfileEl = document.getElementById("target-company-profile");
-  if (targetProfileEl) {
-    targetProfileEl.innerHTML = "";
+  // Extract market category from market summary (first few words)
+  const marketCategory = document.getElementById("market-category");
+  if (marketCategory && data.market_summary) {
+    const firstWords = data.market_summary.split(/[\s,]+/).slice(0, 2).join(" ").replace(/[.,]$/, "");
+    marketCategory.textContent = firstWords || "Market Overview";
+  }
+
+  // Render Market Overview
+  const marketOverviewContent = document.getElementById("market-overview-content");
+  if (marketOverviewContent) {
+    marketOverviewContent.innerHTML = data.market_summary ? `<p class="text-xs leading-relaxed">${data.market_summary}</p>` : "<p class=\"text-slate-500 text-xs\">No market summary available.</p>";
+  }
+
+  // Render Target Company Profile
+  const targetProfileContent = document.getElementById("target-profile-content");
+  if (targetProfileContent) {
+    targetProfileContent.innerHTML = "";
     if (target.overview || target.products?.length || target.strengths?.length || target.weaknesses?.length || target.pricing?.length) {
-      const profileCard = document.createElement("div");
-      profileCard.className = "competitor-card mb-8";
-      profileCard.innerHTML = `<div class="competitor-card-header"><div class="competitor-card-info"><div class="competitor-name">${target.company_name || "Your Company"} — Profile</div></div></div>`;
-
+      let html = "";
       if (target.overview) {
-        const ov = document.createElement("div");
-        ov.className = "section-block mt-4";
-        ov.innerHTML = `<div class="section-title mb-2">📋 Overview</div><div class="overview-text">${target.overview}</div>`;
-        profileCard.appendChild(ov);
+        html += `<div><strong class="text-slate-200">${target.company_name}</strong><p class="text-xs mt-1">${target.overview}</p></div>`;
       }
-      if (target.products?.length) profileCard.appendChild(createSectionBlock("📦 Products", target.products, "", true));
-
-      const swWrap = document.createElement("div");
-      swWrap.className = "competitor-sections";
-      const tLeft = document.createElement("div"); tLeft.className = "space-y-4";
-      const tRight = document.createElement("div"); tRight.className = "space-y-4";
-      if (target.strengths?.length) tLeft.appendChild(createSectionBlock("💪 Strengths", target.strengths));
-      if (target.weaknesses?.length) tRight.appendChild(createSectionBlock("⚠️ Weaknesses", target.weaknesses, "weakness"));
-      if (tLeft.children.length || tRight.children.length) {
-        swWrap.appendChild(tLeft); swWrap.appendChild(tRight);
-        profileCard.appendChild(swWrap);
+      if (target.strengths?.length) {
+        html += `<div><strong class="text-slate-200">Strengths:</strong><ul class="text-xs space-y-0.5 mt-1">` +
+          target.strengths.slice(0, 3).map(s => `<li>• ${s}</li>`).join("") + `</ul></div>`;
       }
-      if (target.pricing?.length) profileCard.appendChild(createPricingSection(target.pricing));
-      targetProfileEl.appendChild(profileCard);
+      if (target.weaknesses?.length) {
+        html += `<div><strong class="text-slate-200">Weaknesses:</strong><ul class="text-xs space-y-0.5 mt-1">` +
+          target.weaknesses.slice(0, 2).map(w => `<li>• ${w}</li>`).join("") + `</ul></div>`;
+      }
+      targetProfileContent.innerHTML = html;
+    } else {
+      targetProfileContent.innerHTML = `<p class="text-slate-500 text-xs">No company profile available.</p>`;
     }
   }
 
@@ -1693,6 +1693,25 @@ if (selectors.downloadPdfBtnSidebar) {
   selectors.downloadPdfBtnSidebar.addEventListener("click", handlePdfDownload);
 }
 
+// Set up collapsible market section toggle
+const toggleMarketBtn = document.getElementById("toggle-market-section");
+const marketSectionContent = document.getElementById("market-section-content");
+const marketToggleIcon = document.getElementById("market-toggle-icon");
+
+if (toggleMarketBtn && marketSectionContent) {
+  toggleMarketBtn.addEventListener("click", () => {
+    const isHidden = marketSectionContent.classList.contains("hidden");
+    if (isHidden) {
+      marketSectionContent.classList.remove("hidden");
+      marketSectionContent.style.maxHeight = "none";
+      marketToggleIcon.style.transform = "rotate(180deg)";
+    } else {
+      marketSectionContent.classList.add("hidden");
+      marketSectionContent.style.maxHeight = "0";
+      marketToggleIcon.style.transform = "rotate(0deg)";
+    }
+  });
+}
 
 window.renderBattlecards = renderBattlecards;
 
