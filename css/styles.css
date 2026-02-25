@@ -389,7 +389,7 @@ section:first-of-type {
 
 /* Strengths styling */
 .section-content .strength {
-  color: var(--accent-green);
+  color: inherit;
   margin-left: 1.5rem;
 }
 
@@ -562,4 +562,218 @@ body {
 
 #playbook-results summary:hover {
   color: #c7d2fe;
+}
+
+/* Loading state styling */
+#loading-state {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  /* Reduce padding on mobile */
+  body {
+    padding: 0;
+  }
+
+  section {
+    padding: 1rem 1rem !important;
+  }
+
+  /* Make form more mobile-friendly */
+  .mx-auto.max-w-4xl {
+    padding: 0 1rem;
+  }
+
+  /* Stack sidebar and main area vertically on mobile */
+  #results .flex-1 {
+    flex-direction: column !important;
+  }
+
+  /* Collapse sidebar to small drawer-like view on mobile */
+  #competitors-sidebar {
+    width: 100% !important;
+    max-width: 100%;
+    flex-shrink: 0;
+    border-right: none;
+    border-bottom: 1px solid rgba(71, 85, 105, 0.5);
+    max-height: 200px;
+    overflow-x: auto;
+  }
+
+  #competitors-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    display: flex;
+    width: auto;
+  }
+
+  .competitor-sidebar-item {
+    flex-shrink: 0;
+    min-width: 150px;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  .competitor-sidebar-item .name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Main content area takes full width */
+  main {
+    width: 100% !important;
+  }
+
+  /* Responsive competitor cards */
+  .competitor-card {
+    min-height: auto;
+  }
+
+  .competitor-card-header {
+    flex-direction: column;
+    padding: 1rem !important;
+  }
+
+  .competitor-card-info {
+    width: 100%;
+  }
+
+  /* Responsive grid for sections */
+  .section-block {
+    min-width: 100%;
+  }
+
+  .col-span-2 {
+    grid-column: 1 / -1 !important;
+  }
+
+  /* Reduce font sizes on mobile */
+  .section-title {
+    font-size: 1rem;
+  }
+
+  .competitor-name {
+    font-size: 1.1rem;
+  }
+
+  .competitor-url {
+    font-size: 0.75rem;
+  }
+
+  .competitor-description {
+    font-size: 0.8rem;
+  }
+
+  /* Sidebar action buttons */
+  #download-pdf-btn-sidebar,
+  #expand-playbook-btn-sidebar {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Make progress track and loading section mobile-friendly */
+  #loading-state {
+    padding: 1rem 0.5rem !important;
+  }
+
+  .progress-track {
+    height: 0.375rem;
+  }
+
+  /* Adjust pricing section for mobile */
+  .pricing-content {
+    padding: 0.75rem;
+    border-left-width: 2px;
+  }
+
+  .pricing-item {
+    padding: 0.375rem 0;
+    font-size: 0.875rem;
+  }
+
+  /* Adjust metric badges */
+  .metric {
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+  }
+
+  .metric-label {
+    min-width: 100%;
+  }
+
+  .metric-value {
+    min-width: 100%;
+  }
+
+  /* Market overview and company panel text adjustments */
+  .market-snapshot-section {
+    padding: 1rem 1rem !important;
+    font-size: 0.95rem;
+  }
+
+  /* Scrollbar styles for mobile */
+  #competitors-list {
+    scrollbar-width: thin;
+  }
+
+  /* Threat badge sizing */
+  .threat-badge {
+    font-size: 0.65rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Extra small devices */
+
+  section {
+    padding: 0.75rem !important;
+  }
+
+  .mx-auto.max-w-4xl {
+    padding: 0 0.75rem;
+  }
+
+  #competitors-sidebar {
+    max-height: 150px;
+  }
+
+  .competitor-sidebar-item {
+    min-width: 120px;
+    padding: 0.5rem 0.5rem !important;
+  }
+
+  .section-title {
+    font-size: 0.95rem;
+  }
+
+  .competitor-name {
+    font-size: 1rem;
+  }
+
+  /* Stack threat level below name on very small screens */
+  .competitor-sidebar-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .threat-badge {
+    font-size: 0.6rem;
+    margin-top: 0.25rem;
+  }
+
+  input[type="url"],
+  input[type="text"],
+  button {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+  }
+
+  /* Reduce padding on form inputs */
+  form {
+    gap: 0.75rem;
+  }
 }

@@ -748,17 +748,16 @@ const renderBattlecards = (data, companyUrl = null) => {
   const target = data.target_company ?? {};
   targetHeader.textContent = `Battlecard for ${target.company_name || "Company"}`;
 
-  // Set market tab label to first 1-2 words of market summary (e.g. "Cybersecurity")
+  // Set market tab label to "Competitive landscape"
   const marketCategory = document.getElementById("market-category");
-  if (marketCategory && data.market_summary) {
-    const firstWords = data.market_summary.split(/[\s,]+/).slice(0, 2).join(" ").replace(/[.,]$/, "");
-    marketCategory.textContent = firstWords || "Market";
+  if (marketCategory) {
+    marketCategory.textContent = "Competitive landscape";
   }
 
-  // Set company tab label to target company name
+  // Set company tab label to "About [company name]"
   const companyTabLabel = document.getElementById("company-tab-label");
   if (companyTabLabel) {
-    companyTabLabel.textContent = target.company_name || "Company";
+    companyTabLabel.textContent = `About ${target.company_name || "Company"}`;
   }
 
   // Render Market Overview (shown in right panel when nav link clicked)
@@ -870,7 +869,7 @@ const renderBattlecards = (data, companyUrl = null) => {
     item.className = `competitor-sidebar-item ${index === 0 ? "active" : ""}`;
     item.dataset.competitorIndex = index;
     item.innerHTML = `
-      <span class="name">${competitor.company_name || `Competitor ${index + 1}`}</span>
+      <span class="name">About ${competitor.company_name || `Competitor ${index + 1}`}</span>
       <span class="threat-badge ${threatLevel.toLowerCase()}">${threatLevel}</span>
     `;
     item.addEventListener("click", () => {
@@ -1250,7 +1249,7 @@ const createSectionBlock = (title, items, itemClass = "", fullWidth = false) => 
 // Helper to create pricing section with special styling
 const createPricingSection = (pricing) => {
   const section = document.createElement("div");
-  section.className = "section-block";
+  section.className = "section-block col-span-2";
 
   const header = document.createElement("div");
   header.className = "section-header";
