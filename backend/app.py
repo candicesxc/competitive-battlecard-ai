@@ -81,21 +81,27 @@ async def generate_sales_playbook(payload: Dict[str, Any]) -> JSONResponse:
     logger.info("Received next-steps request for competitor: %s", payload.get("competitor", {}).get("name"))
 
     try:
+        from openai import AsyncOpenAI
         from .services.sales_playbook_service import SalesPlaybookService
 
         # Extract target company data from URL if provided
         target_company_data = payload.get("target_company", {})
+        context = target_company_data.get("context", "")
+
         if target_company_data.get("url"):
             extracted_data = await extract_company_data(target_company_data["url"])
-            # Merge extracted data with any user-provided context
-            extracted_data["context"] = target_company_data.get("context", "")
-            target_company_data = extracted_data
+            target_company_data.update(extracted_data)
+
+        # Initialize OpenAI client
+        openai_client = AsyncOpenAI()
 
         service = SalesPlaybookService()
         result = await service.generate_comprehensive_playbook(
             competitor=payload.get("competitor"),
             your_company=payload.get("your_company"),
             target_company=target_company_data,
+            context=context,
+            openai_client=openai_client
         )
 
         return JSONResponse(content=result)
