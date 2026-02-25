@@ -185,6 +185,7 @@ section:first-of-type {
 }
 
 .competitor-logo {
+  display: none;
   width: 64px;
   height: 64px;
   border-radius: 0.5rem;
@@ -376,9 +377,23 @@ section:first-of-type {
   margin-right: 0.5rem;
 }
 
+/* Company URL and description styling */
+.competitor-url {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin-top: 0.25rem;
+}
+
+.competitor-description {
+  font-size: 0.875rem;
+  color: #cbd5e1;
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
 /* Weaknesses styling */
 .section-content .weakness {
-  color: #fca5a5;
+  color: #cbd5e1;
   margin-left: 1.5rem;
 }
 

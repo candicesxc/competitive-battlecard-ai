@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .config import get_settings
 from .crew_agents import BattlecardCrew
 from .models import AnalyzeRequest
 from .services.analysis_service import AnalysisError
@@ -92,8 +93,8 @@ async def generate_sales_playbook(payload: Dict[str, Any]) -> JSONResponse:
             extracted_data = await extract_company_data(target_company_data["url"])
             target_company_data.update(extracted_data)
 
-        # Initialize OpenAI client
-        openai_client = AsyncOpenAI()
+        # Initialize OpenAI client with API key
+        openai_client = AsyncOpenAI(api_key=get_settings().openai_api_key.get_secret_value())
 
         service = SalesPlaybookService()
         result = await service.generate_comprehensive_playbook(
