@@ -778,25 +778,39 @@ const renderBattlecards = (data, companyUrl = null) => {
   if (targetProfileContent) {
     const hasData = target.overview || target.products?.length || target.strengths?.length || target.weaknesses?.length || target.pricing?.length;
     if (hasData) {
-      let html = `<div class="space-y-6">`;
-      if (target.overview) {
-        html += `<p class="text-slate-300 leading-relaxed">${target.overview}</p>`;
-      }
+      // Build card-based layout matching competitor cards
+      let html = `<div class="competitor-sections">`;
+
       const sections = [
-        { label: "Products & Services", items: target.products },
-        { label: "Strengths", items: target.strengths },
-        { label: "Weaknesses", items: target.weaknesses },
-        { label: "Pricing", items: target.pricing },
+        { emoji: "📋", label: "Overview", items: target.overview ? [target.overview] : [] },
+        { emoji: "📦", label: "Products", items: target.products || [] },
+        { emoji: "💪", label: "Strengths", items: target.strengths || [] },
+        { emoji: "⚠️", label: "Weaknesses", items: target.weaknesses || [] },
+        { emoji: "💰", label: "Pricing", items: target.pricing || [] },
       ];
-      sections.forEach(({ label, items }) => {
+
+      sections.forEach(({ emoji, label, items }) => {
         if (items?.length) {
-          html += `<div>
-            <h3 class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">${label}</h3>
-            <ul class="space-y-1.5">` +
-            items.map(item => `<li class="flex items-start gap-2 text-slate-300"><span class="text-slate-600 mt-1">•</span><span>${item}</span></li>`).join("") +
-            `</ul></div>`;
+          html += `
+            <div class="section-block">
+              <div class="section-header">
+                <h3 class="section-title">${emoji} ${label}</h3>
+              </div>
+              <div class="section-content">
+                ${items.map(item => {
+                  if (label === "Strengths") {
+                    return `<div class="strength">${item}</div>`;
+                  } else if (label === "Weaknesses") {
+                    return `<div class="weakness">${item}</div>`;
+                  } else {
+                    return `<div>${item}</div>`;
+                  }
+                }).join("")}
+              </div>
+            </div>`;
         }
       });
+
       html += `</div>`;
       targetProfileContent.innerHTML = html;
     } else {
@@ -1802,9 +1816,7 @@ function showMainPanel(panelId) {
   // Update nav link active styles
   navLinks.forEach(l => {
     const isActive = l.dataset.panel === panelId;
-    l.classList.toggle("text-slate-200", isActive);
-    l.classList.toggle("bg-slate-800/60", isActive);
-    l.classList.toggle("text-slate-400", !isActive);
+    l.classList.toggle("active", isActive);
   });
 }
 
@@ -1816,8 +1828,7 @@ function showCompetitorCards() {
 
   // Clear active state on nav links
   navLinks.forEach(l => {
-    l.classList.remove("text-slate-200", "bg-slate-800/60");
-    l.classList.add("text-slate-400");
+    l.classList.remove("active");
   });
 }
 
