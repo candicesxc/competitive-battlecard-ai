@@ -23,21 +23,23 @@
     <script src="js/utils/battlecardPdf.js"></script>
     <script defer src="js/app.js"></script>
   </head>
-  <body class="bg-slate-100 text-slate-900 antialiased">
-    <main class="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-12 sm:px-6 lg:px-8">
-      <header class="mb-12 space-y-5 text-center">
-        <p class="inline-flex items-center gap-2 rounded-full border border-indigo-200/60 bg-white/80 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-600 shadow-sm">
-          Competitive enablement
-        </p>
-        <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-          Generate competitive battlecards in minutes
-        </h1>
-        <p class="mx-auto max-w-3xl text-lg leading-relaxed text-slate-600">
-          Paste any company URL to uncover competitors, SWOT insights, objection handling tips, and go-to-market strategy in a single, polished battlecard.
-        </p>
-      </header>
+  <body class="bg-slate-950 text-slate-100 antialiased">
+    <!-- Header: Analysis Section (Light Mode) -->
+    <section class="bg-gradient-to-b from-slate-50 to-slate-100 px-4 py-12 sm:px-6 lg:px-8 border-b border-slate-200">
+      <div class="mx-auto max-w-4xl">
+        <header class="space-y-5 text-center mb-8">
+          <p class="inline-flex items-center gap-2 rounded-full border border-indigo-200/60 bg-white/80 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-600 shadow-sm">
+            Competitive enablement
+          </p>
+          <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+            Generate competitive battlecards in minutes
+          </h1>
+          <p class="mx-auto max-w-3xl text-lg leading-relaxed text-slate-600">
+            Paste any company URL to uncover competitors, SWOT insights, objection handling tips, and go-to-market strategy.
+          </p>
+        </header>
 
-      <section class="mx-auto w-full max-w-3xl">
+        <!-- Analysis Form -->
         <form
           id="analyze-form"
           class="rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-6 shadow-lg transition-all duration-300 focus-within:border-indigo-400 focus-within:shadow-xl focus-within:shadow-indigo-100/50"
@@ -52,11 +54,11 @@
                 name="company_url"
                 type="text"
                 placeholder="https://example.com"
-                class="w-full rounded-xl border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-slate-900"
                 autocomplete="url"
                 required
               />
-              <div id="domain-suggestion" class="hidden absolute top-full left-0 mt-1 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-indigo-700">
+              <div id="domain-suggestion" class="hidden absolute top-full left-0 mt-1 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-indigo-700 z-10">
                 <span>Did you mean: </span>
                 <button type="button" id="suggestion-button" class="font-semibold underline hover:text-indigo-900"></button>
               </div>
@@ -75,7 +77,7 @@
           <p class="mt-3 flex items-center gap-2 text-xs text-slate-500">
             Works best with tech startups. Uses OpenAI and Exa for research &amp; analysis.
           </p>
-          
+
           <!-- Saved battlecards section -->
           <div id="saved-battlecards-container" class="mt-4 hidden">
             <label class="block text-xs font-medium text-slate-600 mb-2">
@@ -86,40 +88,69 @@
             </div>
           </div>
         </form>
-      </section>
+      </div>
+    </section>
 
-      <section
-        id="error-banner"
-        class="mt-8 hidden rounded-xl border border-red-200 bg-red-50/90 px-4 py-3 text-sm text-red-700 shadow-sm"
-        role="alert"
-      >
+    <!-- Error Banner -->
+    <section
+      id="error-banner"
+      class="hidden px-4 py-3 text-sm text-red-200 bg-red-900/20 border-b border-red-800/30"
+      role="alert"
+    >
+      <div class="mx-auto max-w-4xl">
         <strong class="font-semibold">Heads up:</strong>
         <span id="error-text" class="ml-1"></span>
-      </section>
+      </div>
+    </section>
 
-      <section
-        id="loading-state"
-        class="mt-8 hidden rounded-xl border border-indigo-200 bg-white/90 px-4 py-4 text-sm text-indigo-600 shadow-sm"
-      >
-        <div class="mx-auto w-full max-w-xl space-y-2">
-          <div class="flex items-center justify-between text-xs font-medium text-indigo-700">
+    <!-- Loading State -->
+    <section
+      id="loading-state"
+      class="hidden px-4 py-4 text-sm text-indigo-300 bg-indigo-900/20 border-b border-indigo-800/30"
+    >
+      <div class="mx-auto max-w-4xl">
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs font-medium text-indigo-300">
             <span id="progress-message">Analyzing company website…</span>
           </div>
           <div class="progress-track">
             <div id="progress-fill" class="progress-fill"></div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section id="results" class="mt-12 hidden fade-in">
-        <div class="rounded-3xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-8 shadow-xl">
-          <div id="results-content">
-            <p class="text-sm text-slate-500">
-              Your battlecard will appear here once the analysis completes.
-            </p>
+    <!-- Main Results Section (Dark Theme) -->
+    <div id="results" class="hidden bg-slate-950 min-h-screen flex flex-col">
+      <!-- Header with Target Company Info -->
+      <div class="bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700/50 px-4 py-8 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-7xl">
+          <div id="target-company-header" class="space-y-2">
+            <!-- Target company info will be inserted here -->
           </div>
-          <!-- Download PDF button -->
-          <div id="pdf-download-container" class="mt-6 hidden text-center">
+        </div>
+      </div>
+
+      <!-- Results Content: Sidebar + Main Area -->
+      <div class="flex-1 flex overflow-hidden">
+        <!-- Left Sidebar: Competitors List -->
+        <aside id="competitors-sidebar" class="w-64 bg-slate-900 border-r border-slate-700/50 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-800">
+          <div class="sticky top-0 bg-slate-900 border-b border-slate-700/30 px-4 py-3">
+            <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">COMPETITORS</h3>
+          </div>
+          <div id="competitors-list" class="p-3 space-y-2">
+            <!-- Competitor items will be inserted here -->
+          </div>
+        </aside>
+
+        <!-- Main Content Area: Scrollable Competitor Cards -->
+        <main class="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-800">
+          <div id="competitors-scroll-container" class="px-4 py-8 sm:px-6 lg:px-8">
+            <!-- Competitor cards will be inserted here -->
+          </div>
+
+          <!-- PDF Download Button (inside scrollable area) -->
+          <div id="pdf-download-container" class="hidden px-4 py-8 sm:px-6 lg:px-8 text-center border-t border-slate-700/50">
             <button
               id="download-pdf-btn"
               type="button"
@@ -131,108 +162,111 @@
               Download All Insights as PDF
             </button>
           </div>
+        </main>
+      </div>
+    </div>
 
-          <!-- Next Steps: Collapsible Playbook Generator -->
-          <div class="mt-8">
-            <!-- Expand Button -->
-            <button id="expand-playbook-btn" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-indigo-700 hover:shadow-lg hover:scale-[1.02]">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 5v14M5 12h14"/>
-              </svg>
-              Generate Sales Playbook
-            </button>
+    <!-- Next Steps / Sales Playbook Section (Hidden until results show) -->
+    <section id="next-steps-section" class="hidden bg-slate-950 border-t border-slate-700/50 px-4 py-8 sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-4xl">
+        <button id="expand-playbook-btn" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-indigo-700 hover:shadow-lg hover:scale-[1.02]">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Generate Sales Playbook
+        </button>
 
-            <!-- Playbook Generator (Hidden by default) -->
-            <div id="next-steps-container" class="mt-6 hidden">
-              <div class="rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm p-8 shadow-md">
-                <h2 class="text-2xl font-bold text-slate-900 mb-8">Generate Sales Playbook</h2>
+        <!-- Playbook Generator (Hidden by default) -->
+        <div id="next-steps-container" class="mt-6 hidden">
+          <div class="rounded-2xl border border-slate-700 bg-slate-900/50 backdrop-blur-sm p-8 shadow-md">
+            <h2 class="text-2xl font-bold text-slate-100 mb-8">Generate Sales Playbook</h2>
 
-                <!-- B2B/B2C Toggle -->
-                <div class="mb-8">
-                  <label class="block text-sm font-medium text-slate-700 mb-3">Who are you selling to?</label>
-                  <div class="flex gap-4">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="segment-type" value="b2b" checked class="segment-toggle" />
-                      <span class="text-sm font-medium text-slate-700">B2B (Company)</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="segment-type" value="b2c" class="segment-toggle" />
-                      <span class="text-sm font-medium text-slate-700">B2C (Audience)</span>
-                    </label>
-                  </div>
-                </div>
-
-                <!-- B2B: Target Company Input -->
-                <div id="b2b-section" class="mb-8">
-                  <div class="rounded-xl border border-slate-200/80 bg-slate-50/50 p-6 mb-6">
-                    <h3 class="text-lg font-semibold text-slate-700 mb-4">Target Company to Sell To</h3>
-                    <p class="text-sm text-slate-600 mb-4">Enter details about the prospective company you're competing for.</p>
-                    <div class="space-y-3">
-                      <div>
-                        <label for="playbook-target-url" class="block text-sm font-medium text-slate-700 mb-2">Company Website URL</label>
-                        <input id="playbook-target-url" type="text" placeholder="https://targetcompany.com" class="w-full rounded-lg border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                      </div>
-                      <div>
-                        <label for="playbook-target-context" class="block text-sm font-medium text-slate-700 mb-2">Optional Context</label>
-                        <textarea id="playbook-target-context" placeholder="e.g., Fortune 500, 5K employees, rapid growth phase..." class="w-full rounded-lg border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 resize-none" rows="3"></textarea>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- B2C: Audience Persona Input -->
-                <div id="b2c-section" class="mb-8 hidden">
-                  <div class="rounded-xl border border-slate-200/80 bg-slate-50/50 p-6 mb-6">
-                    <h3 class="text-lg font-semibold text-slate-700 mb-4">Target Audience Persona</h3>
-                    <p class="text-sm text-slate-600 mb-4">Describe the audience segment you're competing for.</p>
-                    <div class="space-y-3">
-                      <div>
-                        <label for="playbook-persona-name" class="block text-sm font-medium text-slate-700 mb-2">Persona Name</label>
-                        <input id="playbook-persona-name" type="text" placeholder="e.g., Marketing Manager, SMB" class="w-full rounded-lg border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                      </div>
-                      <div>
-                        <label for="playbook-persona-context" class="block text-sm font-medium text-slate-700 mb-2">Persona Details</label>
-                        <textarea id="playbook-persona-context" placeholder="e.g., Tech-savvy, budget conscious, needs quick onboarding..." class="w-full rounded-lg border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 resize-none" rows="3"></textarea>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Competitor Selector -->
-                <div class="mb-8">
-                  <div class="rounded-xl border border-slate-200/80 bg-slate-50/50 p-6">
-                    <h3 class="text-lg font-semibold text-slate-700 mb-4">Select Competitor</h3>
-                    <select id="playbook-competitor-select" class="w-full rounded-lg border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                      <option value="">-- Choose a competitor --</option>
-                    </select>
-                  </div>
-                </div>
-
-                <!-- Generate Button -->
-                <div class="flex gap-3">
-                  <button id="generate-playbook-btn" type="button" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-indigo-700 hover:shadow-lg hover:scale-[1.02]">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 5v14M5 12h14"/>
-                    </svg>
-                    Generate Playbook
-                  </button>
-                  <button id="collapse-playbook-btn" type="button" class="inline-flex items-center gap-2 rounded-xl bg-slate-200 px-8 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-300 transition-all">
-                    Cancel
-                  </button>
-                </div>
-
-                <!-- Results Container -->
-                <div id="playbook-results" class="mt-8 hidden"></div>
+            <!-- B2B/B2C Toggle -->
+            <div class="mb-8">
+              <label class="block text-sm font-medium text-slate-300 mb-3">Who are you selling to?</label>
+              <div class="flex gap-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="segment-type" value="b2b" checked class="segment-toggle" />
+                  <span class="text-sm font-medium text-slate-300">B2B (Company)</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="segment-type" value="b2c" class="segment-toggle" />
+                  <span class="text-sm font-medium text-slate-300">B2C (Audience)</span>
+                </label>
               </div>
             </div>
+
+            <!-- B2B: Target Company Input -->
+            <div id="b2b-section" class="mb-8">
+              <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 mb-6">
+                <h3 class="text-lg font-semibold text-slate-200 mb-4">Target Company to Sell To</h3>
+                <p class="text-sm text-slate-400 mb-4">Enter details about the prospective company you're competing for.</p>
+                <div class="space-y-3">
+                  <div>
+                    <label for="playbook-target-url" class="block text-sm font-medium text-slate-300 mb-2">Company Website URL</label>
+                    <input id="playbook-target-url" type="text" placeholder="https://targetcompany.com" class="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-slate-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 placeholder-slate-500" />
+                  </div>
+                  <div>
+                    <label for="playbook-target-context" class="block text-sm font-medium text-slate-300 mb-2">Optional Context</label>
+                    <textarea id="playbook-target-context" placeholder="e.g., Fortune 500, 5K employees, rapid growth phase..." class="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-slate-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 resize-none placeholder-slate-500" rows="3"></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- B2C: Audience Persona Input -->
+            <div id="b2c-section" class="mb-8 hidden">
+              <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 mb-6">
+                <h3 class="text-lg font-semibold text-slate-200 mb-4">Target Audience Persona</h3>
+                <p class="text-sm text-slate-400 mb-4">Describe the audience segment you're competing for.</p>
+                <div class="space-y-3">
+                  <div>
+                    <label for="playbook-persona-name" class="block text-sm font-medium text-slate-300 mb-2">Persona Name</label>
+                    <input id="playbook-persona-name" type="text" placeholder="e.g., Marketing Manager, SMB" class="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-slate-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 placeholder-slate-500" />
+                  </div>
+                  <div>
+                    <label for="playbook-persona-context" class="block text-sm font-medium text-slate-300 mb-2">Persona Details</label>
+                    <textarea id="playbook-persona-context" placeholder="e.g., Tech-savvy, budget conscious, needs quick onboarding..." class="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-slate-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 resize-none placeholder-slate-500" rows="3"></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Competitor Selector -->
+            <div class="mb-8">
+              <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+                <h3 class="text-lg font-semibold text-slate-200 mb-4">Select Competitor</h3>
+                <select id="playbook-competitor-select" class="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-slate-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                  <option value="">-- Choose a competitor --</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Generate Button -->
+            <div class="flex gap-3">
+              <button id="generate-playbook-btn" type="button" class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-indigo-700 hover:shadow-lg hover:scale-[1.02]">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+                Generate Playbook
+              </button>
+              <button id="collapse-playbook-btn" type="button" class="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-8 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-600 transition-all">
+                Cancel
+              </button>
+            </div>
+
+            <!-- Results Container -->
+            <div id="playbook-results" class="mt-8 hidden"></div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <footer class="mt-16 border-t border-slate-200 pt-6 text-xs text-slate-500">
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-700/50 px-4 py-6 text-xs text-slate-500">
+      <div class="mx-auto max-w-4xl">
         <p>© 2026 Candice Shen. All rights reserved.</p>
-      </footer>
-    </main>
+      </div>
+    </footer>
   </body>
 </html>
-

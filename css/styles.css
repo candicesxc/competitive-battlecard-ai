@@ -1,18 +1,24 @@
 :root {
-  color-scheme: light;
-  font-family: "Alan Sans", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  color-scheme: dark;
+  font-family: "Alan Sans", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-newsreader: "Newsreader", serif;
   --font-alan-sans: "Alan Sans", sans-serif;
+  --accent-green: #84cc16; /* Lime green for positives */
+  --accent-red: #ef4444; /* Red for negatives */
+  --threat-high: #dc2626;
+  --threat-medium: #f59e0b;
+  --threat-low: #10b981;
 }
 
 body {
   min-height: 100vh;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+/* Light theme section (header) */
+section:first-of-type {
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  background-image: 
-    radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.06), transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(14, 165, 233, 0.06), transparent 50%),
-    radial-gradient(circle at 40% 60%, rgba(139, 92, 246, 0.04), transparent 50%);
 }
 
 .loader {
@@ -62,19 +68,346 @@ body {
   }
 }
 
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.5);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
+/* Tailwind scrollbar classes */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thumb-slate-700 {
+  scrollbar-color: rgba(51, 65, 85, 0.5) rgba(30, 41, 59, 0.5);
+}
+
+.scrollbar-track-slate-800 {
+  scrollbar-color: rgba(51, 65, 85, 0.5) rgba(30, 41, 59, 0.5);
+}
+
+/* Competitor Sidebar Item */
+.competitor-sidebar-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.competitor-sidebar-item:hover {
+  background-color: rgba(51, 65, 85, 0.5);
+}
+
+.competitor-sidebar-item.active {
+  background-color: rgba(99, 102, 241, 0.2);
+  border-left-color: #6366f1;
+  color: #c7d2fe;
+}
+
+.competitor-sidebar-item .name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.competitor-sidebar-item .threat-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  margin-left: 0.5rem;
+}
+
+.threat-badge.high {
+  background-color: rgba(220, 38, 38, 0.2);
+  color: #fca5a5;
+}
+
+.threat-badge.medium {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+}
+
+.threat-badge.low {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #a7f3d0;
+}
+
+/* Competitor Card */
+.competitor-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.6) 100%);
+  border: 1px solid rgba(71, 85, 105, 0.3);
+  border-radius: 1rem;
+  padding: 2rem;
+  margin-bottom: 3rem;
+  scroll-margin-top: 2rem;
+  transition: all 0.3s ease;
+}
+
+.competitor-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid rgba(71, 85, 105, 0.2);
+}
+
+.competitor-card-info {
+  display: flex;
   gap: 1.5rem;
+  align-items: center;
+}
+
+.competitor-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 0.5rem;
+  background-color: rgba(71, 85, 105, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.competitor-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  font-family: var(--font-newsreader);
+}
+
+.competitor-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metric-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-green);
+  margin-top: 0.25rem;
+}
+
+.threat-level {
+  text-align: right;
+}
+
+.threat-level-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.threat-level-badge.high {
+  background-color: rgba(220, 38, 38, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+}
+
+.threat-level-badge.medium {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.threat-level-badge.low {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #a7f3d0;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Two-Column Layout for Sections */
+.competitor-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 1024px) {
+  .competitor-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+.section-block {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(71, 85, 105, 0.2);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
 }
 
 .section-title {
-  font-size: 1.125rem;
-  letter-spacing: 0.1em;
+  font-size: 1rem;
   font-weight: 600;
-  text-transform: uppercase;
-  font-family: var(--font-newsreader);
-  font-optical-sizing: auto;
+  color: #e2e8f0;
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: var(--font-alan-sans);
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 0.375rem;
+  color: #a5b4fc;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+  background-color: rgba(99, 102, 241, 0.3);
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+.copy-btn.copied {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #a7f3d0;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.section-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+
+.section-content li {
+  margin-left: 1.5rem;
+  color: #cbd5e1;
+}
+
+.section-content li::marker {
+  color: var(--accent-green);
+}
+
+/* Pricing Section */
+.pricing-content {
+  background: rgba(99, 102, 241, 0.1);
+  border-left: 3px solid var(--accent-green);
+  padding: 1rem;
+  border-radius: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+.pricing-item {
+  padding: 0.5rem 0;
+  color: #cbd5e1;
+  font-size: 0.9375rem;
+}
+
+.pricing-item::before {
+  content: "💰 ";
+  margin-right: 0.5rem;
+}
+
+/* Strengths styling */
+.section-content .strength {
+  color: var(--accent-green);
+  margin-left: 1.5rem;
+}
+
+.section-content .strength::before {
+  content: "✓ ";
+  margin-right: 0.5rem;
+}
+
+/* Weaknesses styling */
+.section-content .weakness {
+  color: #fca5a5;
+  margin-left: 1.5rem;
+}
+
+.section-content .weakness::before {
+  content: "✗ ";
+  margin-right: 0.5rem;
+}
+
+/* Overview section */
+.overview-text {
+  color: #cbd5e1;
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+
+/* Keyframes and animations */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: slide-up 0.5s ease-out forwards;
 }
 
 /* Modern SaaS enhancements */
@@ -82,6 +415,7 @@ h1, h2, h3 {
   font-family: var(--font-newsreader);
   font-optical-sizing: auto;
   letter-spacing: -0.02em;
+  color: #f1f5f9;
 }
 
 h1 {
@@ -94,16 +428,6 @@ h2 {
 
 h3 {
   font-weight: 600;
-}
-
-/* Enhanced card shadows and borders */
-article, section {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Smooth scroll */
-html {
-  scroll-behavior: smooth;
 }
 
 /* Enhanced link styles */
@@ -122,42 +446,22 @@ a:hover {
   border-radius: 4px;
 }
 
-/* Enhanced input styling */
-input[type="url"] {
-  transition: all 0.2s ease;
+/* Input styling */
+input[type="url"],
+input[type="text"],
+textarea,
+select {
+  color: #e2e8f0;
 }
 
-input[type="url"]:focus {
+input[type="url"]:focus,
+input[type="text"]:focus,
+textarea:focus,
+select:focus {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
-/* Smooth animations */
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.fade-in {
-  animation: slide-up 0.5s ease-out forwards;
-}
-
-/* Enhanced card hover effects */
-article:hover {
-  transform: translateY(-4px);
-}
-
-/* Better list styling */
-ul {
-  padding-left: 0;
-}
-
-/* Body text styling with Alan Sans */
+/* Body text styling */
 body {
   font-family: var(--font-alan-sans);
   font-optical-sizing: auto;
@@ -165,101 +469,61 @@ body {
   line-height: 1.6;
 }
 
-/* Increase body text size in cards and sections */
-article p,
-section p,
-.text-slate-700,
-.text-slate-600,
-ul li {
-  font-size: 1rem;
-  line-height: 1.7;
+/* PDF Download Container */
+#pdf-download-container {
+  text-align: center;
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(71, 85, 105, 0.2);
 }
 
-/* Market snapshot section styling */
+/* Market snapshot styling */
 .market-snapshot-section {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-  border: 2px solid #bae6fd;
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.2) 0%, rgba(20, 83, 138, 0.2) 100%);
+  border: 1px solid rgba(100, 116, 180, 0.3);
   border-radius: 1rem;
   padding: 1.5rem 2rem;
   margin-bottom: 2rem;
+  color: #cbd5e1;
+  line-height: 1.7;
 }
 
-/* Competitive landscape heading styling - removed separator line */
-.competitive-landscape-header {
-  text-align: center;
-  margin-bottom: 3rem;
-  padding-bottom: 2rem;
-  /* Removed border-bottom for cleaner look */
-}
-
-.competitive-landscape-title {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #1e293b;
-  margin-bottom: 0.75rem;
-  letter-spacing: -0.02em;
-}
-
-.competitive-landscape-subtitle {
-  font-size: 1.125rem;
-  color: #64748b;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-}
-
-/* Competitor tabs styling */
+/* Hide old light theme competitor tabs */
 .competitor-tabs-container {
-  margin-bottom: 2rem;
+  display: none;
 }
 
 .competitor-tab {
-  cursor: pointer;
-  border: none;
-  outline: none;
-  white-space: nowrap;
-  font-size: 1rem;
-  font-weight: 600;
-  padding: 0.875rem 1.5rem;
-  min-height: 3rem;
+  display: none;
+}
+
+.competitor-card.light-theme {
+  display: none;
+}
+
+/* Playbook result styling */
+#playbook-results {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(71, 85, 105, 0.2);
   border-radius: 0.75rem;
-  transition: all 0.2s ease;
+  padding: 1.5rem;
 }
 
-.competitor-tab:focus-visible {
-  outline: 2px solid rgba(99, 102, 241, 0.5);
-  outline-offset: 2px;
+#playbook-results details {
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid rgba(71, 85, 105, 0.2);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  color: #cbd5e1;
 }
 
-.competitor-tab:hover:not([aria-selected="true"]) {
-  transform: translateY(-2px);
-  background-color: #cbd5e1 !important;
-  color: #1e293b !important;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+#playbook-results summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #e2e8f0;
 }
 
-.competitor-card {
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.competitor-card.hidden {
-  display: none;
-}
-
-/* Details/summary chevron rotation for news section */
-details[open] .details-chevron {
-  transform: rotate(180deg);
-}
-
-details summary::-webkit-details-marker {
-  display: none;
-}
-
-/* Sales Playbook Styling */
-#next-steps-container {
-  border-top: 2px solid rgba(99, 102, 241, 0.15);
-  padding-top: 1.5rem;
-}
-
-.animate-spin {
-  animation: spin 1s linear infinite;
+#playbook-results summary:hover {
+  color: #c7d2fe;
 }

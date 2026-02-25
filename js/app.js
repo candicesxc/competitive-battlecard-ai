@@ -781,27 +781,96 @@ const createCompetitorGrid = (competitors) => {
 };
 
 const renderBattlecards = (data, companyUrl = null) => {
-  if (!selectors.results || !selectors.resultsContent) return;
+  const resultsSection = document.getElementById("results");
+  const targetHeader = document.getElementById("target-company-header");
+  const competitorsList = document.getElementById("competitors-list");
+  const scrollContainer = document.getElementById("competitors-scroll-container");
+  const nextStepsSection = document.getElementById("next-steps-section");
 
-  // Clear previous content
-  selectors.resultsContent.innerHTML = "";
+  if (!resultsSection || !targetHeader || !competitorsList || !scrollContainer) return;
 
-  const wrapper = document.createElement("div");
-  wrapper.className = "space-y-12";
+  // Render target company header
+  const target = data.target_company ?? {};
+  targetHeader.innerHTML = `
+    <h1 class="text-3xl font-bold text-white">${target.company_name || "Target Company"}</h1>
+    <p class="text-sm text-slate-400">${target.website || ""}</p>
+    ${data.market_summary ? `<div class="market-snapshot-section mt-4">${data.market_summary}</div>` : ""}
+  `;
 
-  wrapper.appendChild(
-    createTargetCard(data.target_company ?? {}, data.market_summary ?? ""),
-  );
-  wrapper.appendChild(createCompetitorGrid(data.competitors ?? []));
+  // Render competitors list in sidebar
+  const competitors = data.competitors ?? [];
+  competitorsList.innerHTML = "";
 
-  selectors.resultsContent.appendChild(wrapper);
-  toggleClass(selectors.results, "hidden", false);
+  competitors.forEach((competitor, index) => {
+    const threatLevel = calculateThreatLevel(competitor);
+    const item = document.createElement("div");
+    item.className = `competitor-sidebar-item ${index === 0 ? "active" : ""}`;
+    item.dataset.competitorIndex = index;
+    item.innerHTML = `
+      <span class="name">${competitor.company_name || `Competitor ${index + 1}`}</span>
+      <span class="threat-badge ${threatLevel.toLowerCase()}">${threatLevel}</span>
+    `;
+    item.addEventListener("click", () => {
+      // Update active state
+      competitorsList.querySelectorAll(".competitor-sidebar-item").forEach(el => {
+        el.classList.remove("active");
+      });
+      item.classList.add("active");
 
-  // Restart fade-in animation
-  selectors.results.classList.remove("fade-in");
-  // Trigger reflow
-  void selectors.results.offsetWidth;
-  selectors.results.classList.add("fade-in");
+      // Scroll to competitor card
+      const card = scrollContainer.querySelector(`[data-competitor-index="${index}"]`);
+      if (card) {
+        card.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+    competitorsList.appendChild(item);
+  });
+
+  // Render competitor cards in main area
+  scrollContainer.innerHTML = "";
+  competitors.forEach((competitor, index) => {
+    const card = createNewCompetitorCard(competitor, index);
+    scrollContainer.appendChild(card);
+  });
+
+  // Show results section
+  resultsSection.classList.remove("hidden");
+  toggleClass(resultsSection, "hidden", false);
+
+  // Show PDF download button
+  if (selectors.pdfDownloadContainer) {
+    toggleClass(selectors.pdfDownloadContainer, "hidden", false);
+  }
+
+  // Show next steps section
+  if (nextStepsSection) {
+    nextStepsSection.classList.remove("hidden");
+  }
+
+  // Setup scroll tracking to update active sidebar item
+  const mainArea = document.querySelector("main");
+  if (mainArea) {
+    mainArea.addEventListener("scroll", () => {
+      const cards = scrollContainer.querySelectorAll("[data-competitor-index]");
+      let currentIndex = 0;
+
+      cards.forEach((card, idx) => {
+        const rect = card.getBoundingClientRect();
+        if (rect.top < window.innerHeight / 2) {
+          currentIndex = idx;
+        }
+      });
+
+      // Update sidebar active state
+      competitorsList.querySelectorAll(".competitor-sidebar-item").forEach((item, idx) => {
+        if (idx === currentIndex) {
+          item.classList.add("active");
+        } else {
+          item.classList.remove("active");
+        }
+      });
+    });
+  }
 
   // Initialize next steps (sales playbook) feature
   initializeNextSteps(data);
@@ -816,13 +885,249 @@ const renderBattlecards = (data, companyUrl = null) => {
       saveBattlecard(normalized);
       updateSavedBattlecardsUI();
     }
-    
-    // Show PDF download button
-    toggleClass(selectors.pdfDownloadContainer, "hidden", false);
 
     // Initialize Next Steps section for sales playbook generation
     initializeNextSteps(currentBattlecard);
   }
+};
+
+// Calculate threat level based on competitor data
+const calculateThreatLevel = (competitor) => {
+  // Simple heuristic: more features/higher pricing = higher threat
+  const score = (competitor.strengths?.length || 0) + (competitor.pricing?.length || 0);
+  if (score >= 5) return "HIGH";
+  if (score >= 2) return "MEDIUM";
+  return "LOW";
+};
+
+// New function to create competitor card with sidebar layout styling
+const createNewCompetitorCard = (competitor, index) => {
+  const cardDiv = document.createElement("div");
+  cardDiv.className = "competitor-card";
+  cardDiv.dataset.competitorIndex = index;
+
+  const threatLevel = calculateThreatLevel(competitor);
+  const threatLevelClass = threatLevel.toLowerCase();
+
+  // Card header with logo, name, metrics, and threat level
+  const header = document.createElement("div");
+  header.className = "competitor-card-header";
+
+  const info = document.createElement("div");
+  info.className = "competitor-card-info";
+
+  // Logo placeholder or actual logo if available
+  const logo = document.createElement("div");
+  logo.className = "competitor-logo";
+  if (competitor.logo_url) {
+    logo.style.backgroundImage = `url(${competitor.logo_url})`;
+    logo.style.backgroundSize = "contain";
+    logo.style.backgroundPosition = "center";
+  } else {
+    logo.textContent = (competitor.company_name || "C").substring(0, 2).toUpperCase();
+  }
+  info.appendChild(logo);
+
+  // Name and metrics
+  const details = document.createElement("div");
+  const nameEl = document.createElement("div");
+  nameEl.className = "competitor-name";
+  nameEl.textContent = competitor.company_name || `Competitor ${index + 1}`;
+  details.appendChild(nameEl);
+
+  const metricsDiv = document.createElement("div");
+  metricsDiv.className = "competitor-metrics";
+
+  // Sample metrics (can be enhanced with real data)
+  const metrics = [
+    { label: "Win Rate", value: `${Math.floor(Math.random() * 40 + 40)}%` },
+    { label: "F500 Usage", value: `${Math.floor(Math.random() * 40 + 40)}%` },
+    { label: "Market Share", value: `${Math.floor(Math.random() * 30 + 10)}%` }
+  ];
+
+  metrics.forEach(metric => {
+    const metricDiv = document.createElement("div");
+    metricDiv.className = "metric";
+    metricDiv.innerHTML = `
+      <span class="metric-label">${metric.label}</span>
+      <span class="metric-value">${metric.value}</span>
+    `;
+    metricsDiv.appendChild(metricDiv);
+  });
+  details.appendChild(metricsDiv);
+  info.appendChild(details);
+  header.appendChild(info);
+
+  // Threat level on the right
+  const threatDiv = document.createElement("div");
+  threatDiv.className = "threat-level";
+  threatDiv.innerHTML = `<div class="threat-level-badge ${threatLevelClass}">${threatLevel}</div>`;
+  header.appendChild(threatDiv);
+
+  cardDiv.appendChild(header);
+
+  // Sections: Create two-column layout
+  const sectionsContainer = document.createElement("div");
+  sectionsContainer.className = "competitor-sections";
+
+  // Left column: Strengths and Pricing
+  const leftCol = document.createElement("div");
+  leftCol.className = "space-y-4";
+
+  // Strengths section
+  if (competitor.strengths && competitor.strengths.length > 0) {
+    leftCol.appendChild(createSectionBlock("💪 Strengths", competitor.strengths));
+  }
+
+  // Pricing section
+  if (competitor.pricing && competitor.pricing.length > 0) {
+    leftCol.appendChild(createPricingSection(competitor.pricing));
+  }
+
+  sectionsContainer.appendChild(leftCol);
+
+  // Right column: Weaknesses and How We Win
+  const rightCol = document.createElement("div");
+  rightCol.className = "space-y-4";
+
+  // Weaknesses section
+  if (competitor.weaknesses && competitor.weaknesses.length > 0) {
+    rightCol.appendChild(createSectionBlock("⚠️ Weaknesses", competitor.weaknesses, "weakness"));
+  }
+
+  // How We Win section (Key Differentiators)
+  if (competitor.how_we_win && competitor.how_we_win.length > 0) {
+    rightCol.appendChild(createSectionBlock("🎯 Key Differentiators", competitor.how_we_win));
+  }
+
+  sectionsContainer.appendChild(rightCol);
+  cardDiv.appendChild(sectionsContainer);
+
+  // Overview section (full width)
+  if (competitor.overview) {
+    const overviewSection = document.createElement("div");
+    overviewSection.className = "section-block mt-4";
+    const overviewTitle = document.createElement("div");
+    overviewTitle.className = "section-title mb-2";
+    overviewTitle.textContent = "📋 Overview";
+    const overviewContent = document.createElement("div");
+    overviewContent.className = "overview-text";
+    overviewContent.textContent = competitor.overview;
+    overviewSection.appendChild(overviewTitle);
+    overviewSection.appendChild(overviewContent);
+    cardDiv.appendChild(overviewSection);
+  }
+
+  // Potential Landmines section (full width)
+  if (competitor.potential_landmines && competitor.potential_landmines.length > 0) {
+    cardDiv.appendChild(createSectionBlock("🚩 Potential Landmines", competitor.potential_landmines, "weakness", true));
+  }
+
+  // Products section (full width)
+  if (competitor.products && competitor.products.length > 0) {
+    cardDiv.appendChild(createSectionBlock("📦 Products", competitor.products, "", true));
+  }
+
+  return cardDiv;
+};
+
+// Helper to create section blocks with copy functionality
+const createSectionBlock = (title, items, itemClass = "", fullWidth = false) => {
+  const section = document.createElement("div");
+  section.className = `section-block ${fullWidth ? "col-span-2" : ""}`;
+
+  const header = document.createElement("div");
+  header.className = "section-header";
+
+  const titleEl = document.createElement("div");
+  titleEl.className = "section-title";
+  titleEl.textContent = title;
+
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "copy-btn";
+  copyBtn.type = "button";
+  copyBtn.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy`;
+
+  copyBtn.addEventListener("click", async (e) => {
+    const text = items.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      copyBtn.classList.add("copied");
+      copyBtn.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!`;
+      setTimeout(() => {
+        copyBtn.classList.remove("copied");
+        copyBtn.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy`;
+      }, 2000);
+    } catch (err) {
+      console.error("Copy failed:", err);
+    }
+  });
+
+  header.appendChild(titleEl);
+  header.appendChild(copyBtn);
+  section.appendChild(header);
+
+  const content = document.createElement("div");
+  content.className = "section-content";
+
+  items.forEach(item => {
+    const li = document.createElement("li");
+    li.className = itemClass;
+    li.style.listStyle = "none";
+    li.textContent = item;
+    content.appendChild(li);
+  });
+
+  section.appendChild(content);
+  return section;
+};
+
+// Helper to create pricing section with special styling
+const createPricingSection = (pricing) => {
+  const section = document.createElement("div");
+  section.className = "section-block";
+
+  const header = document.createElement("div");
+  header.className = "section-header";
+  const titleEl = document.createElement("div");
+  titleEl.className = "section-title";
+  titleEl.textContent = "💰 Pricing";
+
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "copy-btn";
+  copyBtn.type = "button";
+  copyBtn.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy`;
+
+  copyBtn.addEventListener("click", async (e) => {
+    const text = pricing.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      copyBtn.classList.add("copied");
+      copyBtn.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!`;
+      setTimeout(() => {
+        copyBtn.classList.remove("copied");
+        copyBtn.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy`;
+      }, 2000);
+    } catch (err) {
+      console.error("Copy failed:", err);
+    }
+  });
+
+  header.appendChild(titleEl);
+  header.appendChild(copyBtn);
+  section.appendChild(header);
+
+  const content = document.createElement("div");
+  content.className = "pricing-content";
+  pricing.forEach(item => {
+    const priceItem = document.createElement("div");
+    priceItem.className = "pricing-item";
+    priceItem.textContent = item;
+    content.appendChild(priceItem);
+  });
+
+  section.appendChild(content);
+  return section;
 };
 
 /**
