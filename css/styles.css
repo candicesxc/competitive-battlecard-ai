@@ -162,6 +162,33 @@ section:first-of-type {
   letter-spacing: 0.05em;
   white-space: nowrap;
   margin-left: 0.5rem;
+  position: relative;
+  cursor: default;
+}
+
+/* Threat badge tooltip — sidebar */
+.competitor-sidebar-item .threat-badge[data-threat-reason]:hover::after,
+.threat-level-badge[data-threat-reason]:hover::after {
+  content: attr(data-threat-reason);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 0.75rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.4;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(71, 85, 105, 0.6);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  white-space: normal;
+  width: max-content;
+  max-width: 220px;
+  z-index: 100;
+  pointer-events: none;
 }
 
 .threat-badge.high {
@@ -266,6 +293,8 @@ section:first-of-type {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  position: relative;
+  cursor: default;
 }
 
 .threat-level-badge.high {
@@ -364,7 +393,7 @@ section:first-of-type {
 }
 
 .section-content li::marker {
-  color: var(--accent-green);
+  color: #64748b;
 }
 
 /* Pricing Section */
@@ -377,25 +406,24 @@ section:first-of-type {
 }
 
 .pricing-item {
-  padding: 0.5rem 0;
+  padding: 0.375rem 0;
   color: #cbd5e1;
   font-size: 0.9375rem;
+  list-style: disc;
+  margin-left: 1.25rem;
 }
 
-.pricing-item::before {
-  content: "💰 ";
-  margin-right: 0.5rem;
+/* Section content — plain disc bullets for all item types */
+ul.section-content {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0;
 }
 
-/* Strengths styling */
-.section-content .strength {
-  color: inherit;
-  margin-left: 1.5rem;
-}
-
-.section-content .strength::before {
-  content: "✓ ";
-  margin-right: 0.5rem;
+ul.section-content li {
+  color: #cbd5e1;
+  padding: 0.25rem 0;
+  line-height: 1.5;
 }
 
 /* Company URL and description styling */
@@ -412,15 +440,9 @@ section:first-of-type {
   line-height: 1.4;
 }
 
-/* Weaknesses styling */
+/* Weakness items inherit disc bullet from ul.section-content */
 .section-content .weakness {
   color: #cbd5e1;
-  margin-left: 1.5rem;
-}
-
-.section-content .weakness::before {
-  content: "✗ ";
-  margin-right: 0.5rem;
 }
 
 /* Overview section */

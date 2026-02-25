@@ -819,9 +819,9 @@ const renderBattlecards = (data, companyUrl = null) => {
               <div class="section-header">
                 <h3 class="section-title">💪 Strengths</h3>
               </div>
-              <div class="section-content space-y-2">
-                ${target.strengths.map(item => `<div class="strength text-emerald-400">✓ ${item}</div>`).join("")}
-              </div>
+              <ul class="section-content">
+                ${target.strengths.map(item => `<li>${item}</li>`).join("")}
+              </ul>
             </div>`;
         }
 
@@ -831,9 +831,9 @@ const renderBattlecards = (data, companyUrl = null) => {
               <div class="section-header">
                 <h3 class="section-title">⚠️ Weaknesses</h3>
               </div>
-              <div class="section-content space-y-2">
-                ${target.weaknesses.map(item => `<div class="weakness text-slate-400">✗ ${item}</div>`).join("")}
-              </div>
+              <ul class="section-content">
+                ${target.weaknesses.map(item => `<li>${item}</li>`).join("")}
+              </ul>
             </div>`;
         }
 
@@ -864,13 +864,13 @@ const renderBattlecards = (data, companyUrl = null) => {
   competitorsList.innerHTML = "";
 
   competitors.forEach((competitor, index) => {
-    const threatLevel = calculateThreatLevel(competitor);
+    const { level: threatLevel, reason: threatReason } = calculateThreatLevel(competitor);
     const item = document.createElement("div");
     item.className = `competitor-sidebar-item ${index === 0 ? "active" : ""}`;
     item.dataset.competitorIndex = index;
     item.innerHTML = `
-      <span class="name">About ${competitor.company_name || `Competitor ${index + 1}`}</span>
-      <span class="threat-badge ${threatLevel.toLowerCase()}">${threatLevel}</span>
+      <span class="name">${competitor.company_name || `Competitor ${index + 1}`}</span>
+      <span class="threat-badge ${threatLevel.toLowerCase()}" data-threat-reason="${threatReason}">${threatLevel}</span>
     `;
     item.addEventListener("click", () => {
       // Update active state
@@ -945,77 +945,199 @@ const renderBattlecards = (data, companyUrl = null) => {
   }
 };
 
-// Build competitive landscape matrix visualization
+// Build competitive landscape matrix visualization — dynamic dimensions derived from profile data
 const buildCompetitiveMatrix = (targetCompany, competitors) => {
   if (!competitors || competitors.length === 0) return "";
 
   const targetName = targetCompany?.company_name || "Your Company";
   const allCompanies = [targetCompany, ...competitors].filter(c => c);
 
-  // Dimension scoring: 1-5 scale where 5 is strongest
-  const scoreDimensions = (company) => {
-    const aiCapability = company.overview?.toLowerCase().includes("ai") ? 4 :
-                         company.how_we_win?.some(w => w.toLowerCase().includes("ai")) ? 5 : 2;
-    const scalability = company.strengths?.length > 2 ? 5 : 3;
-    const governance = company.overview?.toLowerCase().includes("govern") ||
-                       company.how_we_win?.some(w => w.toLowerCase().includes("govern")) ? 5 : 3;
-    const ease = company.overview?.toLowerCase().includes("easy") ||
-                 company.how_we_win?.some(w => w.toLowerCase().includes("simple")) ? 4 : 3;
-    const integration = company.how_we_win?.some(w => w.toLowerCase().includes("integrat")) ? 5 :
-                        company.strengths?.length > 1 ? 4 : 2;
-    const deployment = company.weaknesses?.some(w => w.toLowerCase().includes("deploy")) ? 2 :
-                       company.how_we_win?.some(w => w.toLowerCase().includes("hybrid")) ? 5 : 3;
+  // ── Step 1: derive dimensions dynamically from what matters across profiles ──
+  // Collect all text from profiles to find recurring themes
+  const allText = allCompanies.flatMap(c => [
+    c.overview || "",
+    ...(c.strengths || []),
+    ...(c.weaknesses || []),
+    ...(c.how_we_win || []),
+    ...(c.products || []),
+  ]).join(" ").toLowerCase();
 
-    return { aiCapability, scalability, governance, ease, integration, deployment };
+  // Candidate dimension pools — pick those with signal in the profile data
+  const candidateDimensions = [
+    {
+      key: "pricing_transparency",
+      label: "Pricing Transparency",
+      keywords: ["pricing", "price", "cost", "affordable", "free tier", "enterprise pricing", "transparent"],
+    },
+    {
+      key: "ease_of_use",
+      label: "Ease of Use",
+      keywords: ["easy", "simple", "intuitive", "no-code", "low-code", "drag", "onboard", "user-friendly"],
+    },
+    {
+      key: "integration",
+      label: "Integrations",
+      keywords: ["integrat", "api", "connect", "plugin", "ecosystem", "sync", "webhook", "embed"],
+    },
+    {
+      key: "ai_capability",
+      label: "AI / Automation",
+      keywords: ["ai", "artificial intelligence", "machine learning", "automat", "genai", "gpt", "llm", "ml"],
+    },
+    {
+      key: "customization",
+      label: "Customization",
+      keywords: ["custom", "configur", "flexible", "tailor", "white-label", "branded"],
+    },
+    {
+      key: "enterprise_readiness",
+      label: "Enterprise Readiness",
+      keywords: ["enterprise", "scale", "sso", "saml", "soc 2", "security", "compliance", "audit", "role-based"],
+    },
+    {
+      key: "support",
+      label: "Support & Community",
+      keywords: ["support", "community", "documentation", "helpdesk", "onboarding", "success manager", "forum"],
+    },
+    {
+      key: "content_depth",
+      label: "Content / Curriculum",
+      keywords: ["content", "curriculum", "course", "learning path", "certificate", "module", "lesson"],
+    },
+    {
+      key: "analytics",
+      label: "Analytics & Reporting",
+      keywords: ["analytic", "reporting", "dashboard", "insight", "track", "metric", "progress"],
+    },
+    {
+      key: "mobile",
+      label: "Mobile Experience",
+      keywords: ["mobile", "app", "ios", "android", "offline", "responsive"],
+    },
+    {
+      key: "data_privacy",
+      label: "Data & Privacy",
+      keywords: ["privacy", "gdpr", "data residency", "hipaa", "data control", "own your data"],
+    },
+    {
+      key: "speed_to_value",
+      label: "Speed to Value",
+      keywords: ["fast", "quick", "minutes", "instant", "time-to-value", "rapid deploy", "launch quickly"],
+    },
+  ];
+
+  // Only keep dimensions that appear in the actual profile data
+  const activeDimensions = candidateDimensions
+    .filter(d => d.keywords.some(kw => allText.includes(kw)))
+    .slice(0, 7); // cap at 7 for readability
+
+  // Fall back to three generic ones if nothing matches
+  if (activeDimensions.length < 3) {
+    activeDimensions.push(
+      { key: "strengths_breadth", label: "Feature Breadth", keywords: [] },
+      { key: "pricing_transparency", label: "Pricing Transparency", keywords: ["pricing"] },
+      { key: "ease_of_use", label: "Ease of Use", keywords: ["easy"] },
+    );
+  }
+
+  // ── Step 2: score each company per active dimension ──
+  // Returns { score: 1-5 | null, rationale: string }
+  const scoreCompany = (company, dim) => {
+    const allFields = [
+      company.overview || "",
+      ...(company.strengths || []),
+      ...(company.weaknesses || []),
+      ...(company.how_we_win || []),
+      ...(company.products || []),
+    ];
+    const joined = allFields.join(" ").toLowerCase();
+
+    const hitInStrength = (company.strengths || []).some(s =>
+      dim.keywords.some(kw => s.toLowerCase().includes(kw))
+    );
+    const hitInWin = (company.how_we_win || []).some(s =>
+      dim.keywords.some(kw => s.toLowerCase().includes(kw))
+    );
+    const hitInWeakness = (company.weaknesses || []).some(s =>
+      dim.keywords.some(kw => s.toLowerCase().includes(kw))
+    );
+    const hitInOverview = dim.keywords.some(kw => (company.overview || "").toLowerCase().includes(kw));
+    const anyHit = dim.keywords.some(kw => joined.includes(kw));
+
+    if (!anyHit && dim.keywords.length > 0) {
+      return { score: null, rationale: "Not mentioned in profile — needs verification" };
+    }
+
+    if (hitInWeakness && !hitInStrength && !hitInWin) {
+      return { score: 2, rationale: "Listed as a weakness in the profile" };
+    }
+    if (hitInStrength && hitInWin) {
+      return { score: 5, rationale: "Mentioned in both strengths and key differentiators" };
+    }
+    if (hitInStrength || hitInWin) {
+      return { score: 4, rationale: hitInStrength ? "Listed as a strength in the profile" : "Called out as a key differentiator" };
+    }
+    if (hitInOverview) {
+      return { score: 3, rationale: "Referenced in overview — depth unclear" };
+    }
+    return { score: 3, rationale: "Mentioned in profile but not highlighted" };
   };
 
-  const dimensionLabels = ["AI & Innovation", "Scalability", "Governance", "Ease of Use", "Integrations", "Deployment Flex"];
-  const dimensionKeys = ["aiCapability", "scalability", "governance", "ease", "integration", "deployment"];
-
-  // Score all companies
+  // Compute scores for all companies × dimensions
   const scores = {};
   allCompanies.forEach(c => {
-    scores[c.company_name || "Company"] = scoreDimensions(c);
+    const name = c.company_name || "Company";
+    scores[name] = {};
+    activeDimensions.forEach(dim => {
+      scores[name][dim.key] = scoreCompany(c, dim);
+    });
   });
 
-  // Build matrix HTML
+  // ── Step 3: build the HTML table ──
   let html = `
     <div class="mt-8 pt-8 border-t border-slate-700/30">
-      <h3 class="text-base font-semibold text-slate-100 mb-6">Competitive Landscape Matrix</h3>
+      <h3 class="text-base font-semibold text-slate-100 mb-1">Competitive Landscape Matrix</h3>
+      <p class="text-xs text-slate-500 mb-5">Scores derived from battlecard profile data. Hover a cell for rationale. Cells marked <span class="font-semibold text-amber-400">NEEDS DATA</span> indicate gaps not covered by the current profile.</p>
       <div class="overflow-x-auto">
         <table class="w-full border-collapse text-sm">
           <thead>
             <tr class="border-b border-slate-700/50">
-              <th class="text-left py-3 px-4 font-semibold text-slate-300 bg-slate-900/50">Dimension</th>`;
+              <th class="text-left py-3 px-4 font-semibold text-slate-400 bg-slate-900/50 text-xs uppercase tracking-wider">Dimension</th>`;
 
   allCompanies.forEach(company => {
     const name = company.company_name || "Company";
     const isTarget = name === targetName;
-    html += `<th class="text-center py-3 px-4 font-semibold ${isTarget ? 'bg-indigo-950/40 text-indigo-300 border-l-2 border-indigo-500' : 'text-slate-300'}">${name}</th>`;
+    html += `<th class="text-center py-3 px-4 font-semibold text-xs ${isTarget ? 'bg-indigo-950/40 text-indigo-300 border-l-2 border-indigo-500' : 'text-slate-300'}">${name}</th>`;
   });
 
   html += `</tr></thead><tbody>`;
 
-  // Add rows for each dimension
-  dimensionLabels.forEach((label, idx) => {
-    const key = dimensionKeys[idx];
-    html += `<tr class="border-b border-slate-700/20 hover:bg-slate-900/30"><td class="py-3 px-4 font-medium text-slate-300">${label}</td>`;
+  activeDimensions.forEach(dim => {
+    html += `<tr class="border-b border-slate-700/20 hover:bg-slate-900/30">
+      <td class="py-3 px-4 font-medium text-slate-300 text-xs">${dim.label}</td>`;
 
     allCompanies.forEach(company => {
       const name = company.company_name || "Company";
       const isTarget = name === targetName;
-      const score = scores[name][key];
-      const barWidth = (score / 5) * 100;
-      const color = score >= 4 ? "bg-emerald-600/60" : score >= 3 ? "bg-amber-600/60" : "bg-slate-600/40";
+      const { score, rationale } = scores[name][dim.key];
+      const tdClass = `py-3 px-4 text-center ${isTarget ? 'bg-indigo-950/20 border-l-2 border-indigo-500' : ''}`;
 
-      html += `<td class="py-3 px-4 text-center ${isTarget ? 'bg-indigo-950/20 border-l-2 border-indigo-500' : ''}">
-        <div class="flex items-center justify-center gap-2">
-          <div class="w-12 h-6 bg-slate-800/50 rounded border border-slate-700/50 overflow-hidden">
-            <div class="${color} h-full transition-all" style="width: ${barWidth}%"></div>
+      if (score === null) {
+        html += `<td class="${tdClass}" title="${rationale}">
+          <span class="text-xs font-semibold text-amber-400 cursor-help" title="${rationale}">NEEDS DATA</span>
+        </td>`;
+      } else {
+        const barWidth = (score / 5) * 100;
+        const color = score >= 4 ? "bg-emerald-600/60" : score >= 3 ? "bg-amber-600/60" : "bg-rose-600/50";
+        html += `<td class="${tdClass}">
+          <div class="flex items-center justify-center gap-2 group relative cursor-help" title="${rationale}">
+            <div class="w-12 h-5 bg-slate-800/50 rounded border border-slate-700/50 overflow-hidden flex-shrink-0">
+              <div class="${color} h-full transition-all" style="width: ${barWidth}%"></div>
+            </div>
+            <span class="text-xs font-semibold text-slate-300">${score}/5</span>
           </div>
-          <span class="text-xs font-semibold text-slate-300">${score}/5</span>
-        </div>
-      </td>`;
+        </td>`;
+      }
     });
 
     html += `</tr>`;
@@ -1026,23 +1148,11 @@ const buildCompetitiveMatrix = (targetCompany, competitors) => {
     </table>
   </div>
 
-  <div class="mt-6 grid grid-cols-2 gap-4 text-xs">
-    <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
-      <p class="font-semibold text-slate-300 mb-1">🟢 Strong (4-5)</p>
-      <p class="text-slate-400">Clear competitive advantage</p>
-    </div>
-    <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
-      <p class="font-semibold text-slate-300 mb-1">🟡 Moderate (3)</p>
-      <p class="text-slate-400">Comparable to competitors</p>
-    </div>
-    <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
-      <p class="font-semibold text-slate-300 mb-1">🔴 Weak (1-2)</p>
-      <p class="text-slate-400">Area of concern</p>
-    </div>
-    <div class="p-3 rounded-lg bg-indigo-950/30 border border-indigo-700/30">
-      <p class="font-semibold text-indigo-300 mb-1">📍 Your Company</p>
-      <p class="text-slate-400">Highlighted for reference</p>
-    </div>
+  <div class="mt-4 flex flex-wrap gap-3 text-xs text-slate-500">
+    <span>🟢 Strong (4–5) — explicitly in strengths or differentiators</span>
+    <span>🟡 Moderate (3) — mentioned but not highlighted</span>
+    <span>🔴 Weak (1–2) — listed as weakness</span>
+    <span class="text-amber-400">NEEDS DATA — not in current profile</span>
   </div>
 `;
 
@@ -1050,12 +1160,31 @@ const buildCompetitiveMatrix = (targetCompany, competitors) => {
 };
 
 // Calculate threat level based on competitor data
+// Returns { level: "HIGH"|"MEDIUM"|"LOW", reason: string }
 const calculateThreatLevel = (competitor) => {
-  // Simple heuristic: more features/higher pricing = higher threat
-  const score = (competitor.strengths?.length || 0) + (competitor.pricing?.length || 0);
-  if (score >= 5) return "HIGH";
-  if (score >= 2) return "MEDIUM";
-  return "LOW";
+  const strengthCount = competitor.strengths?.length || 0;
+  const weaknessCount = competitor.weaknesses?.length || 0;
+  const pricingCount  = competitor.pricing?.length || 0;
+  const score = strengthCount + pricingCount;
+
+  if (score >= 5) {
+    return {
+      level: "HIGH",
+      reason: `${strengthCount} documented strengths with ${pricingCount > 0 ? "defined pricing tiers" : "broad feature coverage"} — strong competitive overlap`,
+    };
+  }
+  if (score >= 2) {
+    return {
+      level: "MEDIUM",
+      reason: `${strengthCount} documented strength${strengthCount !== 1 ? "s" : ""} — partial overlap; monitor closely`,
+    };
+  }
+  return {
+    level: "LOW",
+    reason: weaknessCount > strengthCount
+      ? `More weaknesses (${weaknessCount}) than strengths (${strengthCount}) — limited competitive threat`
+      : "Insufficient data to fully assess; treat as low risk for now",
+  };
 };
 
 // New function to create competitor card with sidebar layout styling
@@ -1064,7 +1193,7 @@ const createNewCompetitorCard = (competitor, index) => {
   cardDiv.className = "competitor-card";
   cardDiv.dataset.competitorIndex = index;
 
-  const threatLevel = calculateThreatLevel(competitor);
+  const { level: threatLevel, reason: threatReason } = calculateThreatLevel(competitor);
   const threatLevelClass = threatLevel.toLowerCase();
 
   // Card header with name, company details, and threat level
@@ -1130,7 +1259,7 @@ const createNewCompetitorCard = (competitor, index) => {
   // Threat level on the right
   const threatDiv = document.createElement("div");
   threatDiv.className = "threat-level";
-  threatDiv.innerHTML = `<div class="threat-level-badge ${threatLevelClass}">${threatLevel}</div>`;
+  threatDiv.innerHTML = `<div class="threat-level-badge ${threatLevelClass}" data-threat-reason="${threatReason}">${threatLevel}</div>`;
   header.appendChild(threatDiv);
 
   cardDiv.appendChild(header);
@@ -1231,13 +1360,12 @@ const createSectionBlock = (title, items, itemClass = "", fullWidth = false) => 
   header.appendChild(copyBtn);
   section.appendChild(header);
 
-  const content = document.createElement("div");
+  const content = document.createElement("ul");
   content.className = "section-content";
 
   items.forEach(item => {
     const li = document.createElement("li");
-    li.className = itemClass;
-    li.style.listStyle = "none";
+    if (itemClass) li.className = itemClass;
     li.textContent = item;
     content.appendChild(li);
   });
@@ -1281,10 +1409,10 @@ const createPricingSection = (pricing) => {
   header.appendChild(copyBtn);
   section.appendChild(header);
 
-  const content = document.createElement("div");
+  const content = document.createElement("ul");
   content.className = "pricing-content";
   pricing.forEach(item => {
-    const priceItem = document.createElement("div");
+    const priceItem = document.createElement("li");
     priceItem.className = "pricing-item";
     priceItem.textContent = item;
     content.appendChild(priceItem);
