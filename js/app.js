@@ -100,8 +100,6 @@ const selectors = {
   suggestionButton: document.getElementById("suggestion-button"),
   savedBattlecardsContainer: document.getElementById("saved-battlecards-container"),
   savedBattlecardsList: document.getElementById("saved-battlecards-list"),
-  pdfDownloadContainer: document.getElementById("pdf-download-container"),
-  downloadPdfBtn: document.getElementById("download-pdf-btn"),
   downloadPdfBtnSidebar: document.getElementById("download-pdf-btn-sidebar"),
   expandPlaybookBtnSidebar: document.getElementById("expand-playbook-btn-sidebar"),
 };
@@ -758,13 +756,45 @@ const renderBattlecards = (data, companyUrl = null) => {
 
   if (!resultsSection || !targetHeader || !competitorsList || !scrollContainer) return;
 
-  // Render target company header
+  // Render target company header + profile card
   const target = data.target_company ?? {};
   targetHeader.innerHTML = `
     <h1 class="text-3xl font-bold text-white">${target.company_name || "Target Company"}</h1>
-    <p class="text-sm text-slate-400">${target.website || ""}</p>
+    ${target.website ? `<p class="text-sm text-slate-400">${target.website}</p>` : ""}
     ${data.market_summary ? `<div class="market-snapshot-section mt-4">${data.market_summary}</div>` : ""}
   `;
+
+  // Render the target company profile card (overview/products/strengths/weaknesses/pricing)
+  const targetProfileEl = document.getElementById("target-company-profile");
+  if (targetProfileEl) {
+    targetProfileEl.innerHTML = "";
+    if (target.overview || target.products?.length || target.strengths?.length || target.weaknesses?.length || target.pricing?.length) {
+      const profileCard = document.createElement("div");
+      profileCard.className = "competitor-card mb-8";
+      profileCard.innerHTML = `<div class="competitor-card-header"><div class="competitor-card-info"><div class="competitor-name">${target.company_name || "Your Company"} — Profile</div></div></div>`;
+
+      if (target.overview) {
+        const ov = document.createElement("div");
+        ov.className = "section-block mt-4";
+        ov.innerHTML = `<div class="section-title mb-2">📋 Overview</div><div class="overview-text">${target.overview}</div>`;
+        profileCard.appendChild(ov);
+      }
+      if (target.products?.length) profileCard.appendChild(createSectionBlock("📦 Products", target.products, "", true));
+
+      const swWrap = document.createElement("div");
+      swWrap.className = "competitor-sections";
+      const tLeft = document.createElement("div"); tLeft.className = "space-y-4";
+      const tRight = document.createElement("div"); tRight.className = "space-y-4";
+      if (target.strengths?.length) tLeft.appendChild(createSectionBlock("💪 Strengths", target.strengths));
+      if (target.weaknesses?.length) tRight.appendChild(createSectionBlock("⚠️ Weaknesses", target.weaknesses, "weakness"));
+      if (tLeft.children.length || tRight.children.length) {
+        swWrap.appendChild(tLeft); swWrap.appendChild(tRight);
+        profileCard.appendChild(swWrap);
+      }
+      if (target.pricing?.length) profileCard.appendChild(createPricingSection(target.pricing));
+      targetProfileEl.appendChild(profileCard);
+    }
+  }
 
   // Render competitors list in sidebar
   const competitors = data.competitors ?? [];
@@ -804,17 +834,6 @@ const renderBattlecards = (data, companyUrl = null) => {
 
   // Show results section
   resultsSection.classList.remove("hidden");
-  toggleClass(resultsSection, "hidden", false);
-
-  // Show PDF download button
-  if (selectors.pdfDownloadContainer) {
-    toggleClass(selectors.pdfDownloadContainer, "hidden", false);
-  }
-
-  // Show next steps section
-  if (nextStepsSection) {
-    nextStepsSection.classList.remove("hidden");
-  }
 
   // Setup scroll tracking to update active sidebar item
   const mainArea = document.querySelector("main");
@@ -946,44 +965,7 @@ const createNewCompetitorCard = (competitor, index) => {
 
   cardDiv.appendChild(header);
 
-  // Sections: Create two-column layout
-  const sectionsContainer = document.createElement("div");
-  sectionsContainer.className = "competitor-sections";
-
-  // Left column: Strengths and Pricing
-  const leftCol = document.createElement("div");
-  leftCol.className = "space-y-4";
-
-  // Strengths section
-  if (competitor.strengths && competitor.strengths.length > 0) {
-    leftCol.appendChild(createSectionBlock("💪 Strengths", competitor.strengths));
-  }
-
-  // Pricing section
-  if (competitor.pricing && competitor.pricing.length > 0) {
-    leftCol.appendChild(createPricingSection(competitor.pricing));
-  }
-
-  sectionsContainer.appendChild(leftCol);
-
-  // Right column: Weaknesses and How We Win
-  const rightCol = document.createElement("div");
-  rightCol.className = "space-y-4";
-
-  // Weaknesses section
-  if (competitor.weaknesses && competitor.weaknesses.length > 0) {
-    rightCol.appendChild(createSectionBlock("⚠️ Weaknesses", competitor.weaknesses, "weakness"));
-  }
-
-  // How We Win section (Key Differentiators)
-  if (competitor.how_we_win && competitor.how_we_win.length > 0) {
-    rightCol.appendChild(createSectionBlock("🎯 Key Differentiators", competitor.how_we_win));
-  }
-
-  sectionsContainer.appendChild(rightCol);
-  cardDiv.appendChild(sectionsContainer);
-
-  // Overview section (full width)
+  // 1. Overview (full width)
   if (competitor.overview) {
     const overviewSection = document.createElement("div");
     overviewSection.className = "section-block mt-4";
@@ -998,14 +980,46 @@ const createNewCompetitorCard = (competitor, index) => {
     cardDiv.appendChild(overviewSection);
   }
 
-  // Potential Landmines section (full width)
+  // 2. Products (full width)
+  if (competitor.products && competitor.products.length > 0) {
+    cardDiv.appendChild(createSectionBlock("📦 Products", competitor.products, "", true));
+  }
+
+  // 3 & 4. Strengths + Weaknesses (two columns)
+  const swContainer = document.createElement("div");
+  swContainer.className = "competitor-sections";
+
+  const leftCol = document.createElement("div");
+  leftCol.className = "space-y-4";
+  if (competitor.strengths && competitor.strengths.length > 0) {
+    leftCol.appendChild(createSectionBlock("💪 Strengths", competitor.strengths));
+  }
+
+  const rightCol = document.createElement("div");
+  rightCol.className = "space-y-4";
+  if (competitor.weaknesses && competitor.weaknesses.length > 0) {
+    rightCol.appendChild(createSectionBlock("⚠️ Weaknesses", competitor.weaknesses, "weakness"));
+  }
+
+  if (leftCol.children.length > 0 || rightCol.children.length > 0) {
+    swContainer.appendChild(leftCol);
+    swContainer.appendChild(rightCol);
+    cardDiv.appendChild(swContainer);
+  }
+
+  // 5. Key Differentiators (full width)
+  if (competitor.how_we_win && competitor.how_we_win.length > 0) {
+    cardDiv.appendChild(createSectionBlock("🎯 Key Differentiators", competitor.how_we_win, "", true));
+  }
+
+  // 6. Potential Landmines (full width)
   if (competitor.potential_landmines && competitor.potential_landmines.length > 0) {
     cardDiv.appendChild(createSectionBlock("🚩 Potential Landmines", competitor.potential_landmines, "weakness", true));
   }
 
-  // Products section (full width)
-  if (competitor.products && competitor.products.length > 0) {
-    cardDiv.appendChild(createSectionBlock("📦 Products", competitor.products, "", true));
+  // 7. Pricing (full width)
+  if (competitor.pricing && competitor.pricing.length > 0) {
+    cardDiv.appendChild(createPricingSection(competitor.pricing));
   }
 
   return cardDiv;
@@ -1233,8 +1247,6 @@ const handleSubmit = async (event) => {
   }
 
   setLoading(true);
-  // Hide PDF button while loading
-  toggleClass(selectors.pdfDownloadContainer, "hidden", true);
   currentBattlecard = null;
   
   try {
@@ -1335,57 +1347,38 @@ const initializeNextSteps = (battlecard) => {
     return;
   }
 
-  const expandPlaybookBtn = document.getElementById("expand-playbook-btn");
-  const nextStepsContainer = document.getElementById("next-steps-container");
+  const nextStepsSection = document.getElementById("next-steps-section");
   const competitorSelect = document.getElementById("playbook-competitor-select");
   const generateBtn = document.getElementById("generate-playbook-btn");
   const collapseBtn = document.getElementById("collapse-playbook-btn");
   const segmentToggles = document.querySelectorAll(".segment-toggle");
 
-  if (!expandPlaybookBtn) {
-    console.error("expandPlaybookBtn not found");
-    return;
-  }
-  if (!nextStepsContainer) {
-    console.error("nextStepsContainer not found");
-    return;
-  }
-  if (!competitorSelect) {
-    console.error("competitorSelect not found");
-    return;
-  }
-  if (!generateBtn) {
-    console.error("generateBtn not found");
+  if (!competitorSelect || !generateBtn) {
+    console.error("initializeNextSteps: missing required elements");
     return;
   }
 
   console.log("Initializing next steps with", data.competitors.length, "competitors");
 
-  // Set up expand button handler
-  if (!expandPlaybookBtn.dataset.initialized) {
-    expandPlaybookBtn.addEventListener("click", () => {
-      nextStepsContainer.classList.remove("hidden");
-      expandPlaybookBtn.classList.add("hidden");
-    });
-    expandPlaybookBtn.dataset.initialized = "true";
-  }
+  // Helper: show the playbook section and scroll to it
+  const showPlaybookSection = () => {
+    if (nextStepsSection) {
+      nextStepsSection.classList.remove("hidden");
+      nextStepsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
-  // Set up expand button handler for sidebar button
+  // Sidebar "Generate Playbook" button
   const expandPlaybookBtnSidebar = document.getElementById("expand-playbook-btn-sidebar");
   if (expandPlaybookBtnSidebar && !expandPlaybookBtnSidebar.dataset.initialized) {
-    expandPlaybookBtnSidebar.addEventListener("click", () => {
-      nextStepsContainer.classList.remove("hidden");
-      expandPlaybookBtn.classList.add("hidden");
-    });
+    expandPlaybookBtnSidebar.addEventListener("click", showPlaybookSection);
     expandPlaybookBtnSidebar.dataset.initialized = "true";
   }
 
-  // Set up collapse button handler
+  // Close button inside the form
   if (collapseBtn && !collapseBtn.dataset.initialized) {
     collapseBtn.addEventListener("click", () => {
-      nextStepsContainer.classList.add("hidden");
-      expandPlaybookBtn.classList.remove("hidden");
-      // Clear results when collapsing
+      if (nextStepsSection) nextStepsSection.classList.add("hidden");
       const resultsContainer = document.getElementById("playbook-results");
       if (resultsContainer) {
         resultsContainer.innerHTML = "";
@@ -1695,12 +1688,9 @@ if (document.readyState === 'loading') {
   updateSavedBattlecardsUI();
 }
 
-// Set up PDF download button
-if (selectors.downloadPdfBtn) {
-  selectors.downloadPdfBtn.addEventListener("click", handlePdfDownload);
-  if (selectors.downloadPdfBtnSidebar) {
-    selectors.downloadPdfBtnSidebar.addEventListener("click", handlePdfDownload);
-  }
+// Set up PDF download button (sidebar only now)
+if (selectors.downloadPdfBtnSidebar) {
+  selectors.downloadPdfBtnSidebar.addEventListener("click", handlePdfDownload);
 }
 
 
