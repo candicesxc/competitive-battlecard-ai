@@ -1519,8 +1519,8 @@ const firstClause = (text) => text.split(/[.,;]/)[0].trim().toLowerCase();
 
 // ── Per-section builders — every one takes contextLabel + contextDetails ──
 
-// 1. Positioning angle
-const buildPositioningAngle = (differentiators, theirWeaknesses, theirName, ourName, contextLabel, contextDetails, isB2C) => {
+// 1. Positioning angle — incorporate research pain points & priorities
+const buildPositioningAngle = (differentiators, theirWeaknesses, theirName, ourName, contextLabel, contextDetails, isB2C, painPoints = []) => {
   const d1 = differentiators[0] || "";
   const d2 = differentiators[1] || "";
   const w1 = theirWeaknesses[0] || "";
@@ -1529,19 +1529,47 @@ const buildPositioningAngle = (differentiators, theirWeaknesses, theirName, ourN
     ? `For someone ${firstClause(contextDetails)}`
     : `For ${contextLabel}`;
 
-  let angle = `${forWhom}, ${ourName} has a clear edge over ${theirName}.`;
-  if (d1) angle += ` ${d1.replace(/\.$/, "")}.`;
+  // If we have pain points, frame the angle around what matters to them
+  let angle = `${forWhom}, ${ourName} beats ${theirName} where it counts.`;
+
+  if (painPoints.length > 0) {
+    // Find differentiators that address the top pain point
+    const relevantDiff = differentiators.find(d =>
+      painPoints.some(p => d.toLowerCase().includes(p.toLowerCase().split(" ")[0]))
+    ) || d1;
+    angle += ` When ${painPoints[0]} is the priority, ${relevantDiff.replace(/\.$/, "").toLowerCase()}.`;
+  } else if (d1) {
+    angle += ` ${d1.replace(/\.$/, "")}.`;
+  }
+
   if (w1) angle += ` ${theirName}'s gap: ${w1.charAt(0).toLowerCase() + w1.slice(1).replace(/\.$/, "")}.`;
   if (d2 && d2 !== d1) angle += ` ${d2.replace(/\.$/, "")}.`;
   return angle;
 };
 
-// 2. Opening hook
-const buildOpeningHook = (theirName, contextLabel, contextDetails, isB2C) => {
-  if (isB2C && contextDetails)
-    return `"You mentioned you're ${firstClause(contextDetails)}. The question isn't whether ${theirName} has content — it's whether what you get from them actually achieves that. Let's start there."`;
-  if (!isB2C && contextLabel && contextLabel !== "the prospect")
+// 2. Opening hook — enhanced with pain points if available
+const buildOpeningHook = (theirName, contextLabel, contextDetails, isB2C, painPoints = []) => {
+  const topPain = painPoints.length > 0 ? painPoints[0] : null;
+
+  if (isB2C && contextDetails) {
+    const situation = firstClause(contextDetails);
+    if (topPain) {
+      return `"You mentioned you're ${situation}, and ${topPain.toLowerCase()} is critical. Here's the hard truth about ${theirName}: they optimize for scale, not for that specific challenge. Let's talk about what actually solves it."`;
+    }
+    return `"You mentioned you're ${situation}. The question isn't whether ${theirName} has content — it's whether what you get from them actually achieves that goal. Let's start there."`;
+  }
+
+  if (!isB2C && contextLabel && contextLabel !== "the prospect") {
+    if (topPain) {
+      return `"For ${contextLabel}, ${topPain.toLowerCase()} is likely your biggest constraint. ${theirName} isn't built to solve that. Here's why we are."`;
+    }
     return `"For a company like ${contextLabel}, the evaluation shouldn't stop at feature comparison against ${theirName}. What matters is which option moves the metric you care about. Let's dig into that."`;
+  }
+
+  if (topPain) {
+    return `"${topPain} is what's keeping you up at night. ${theirName} won't solve it. Here's why, and what actually will."`;
+  }
+
   return `"${theirName} is a known name — but let's compare outcomes, not just features. What does success actually look like for you?"`;
 };
 
@@ -1565,8 +1593,8 @@ const buildWatchOutFor = (landmines, differentiators, contextLabel, contextDetai
   });
 };
 
-// 5. Discovery questions — persona/company prefix on every question
-const differentiatorToQuestion = (diff, theirName, contextLabel, contextDetails, isB2C) => {
+// 5. Discovery questions — persona/company prefix + pain point context
+const differentiatorToQuestion = (diff, theirName, contextLabel, contextDetails, isB2C, painPoints = []) => {
   const l = diff.toLowerCase();
   let q;
   if (l.includes("accredit") || l.includes("recogni") || l.includes("verif"))
@@ -1591,6 +1619,13 @@ const differentiatorToQuestion = (diff, theirName, contextLabel, contextDetails,
     const core = diff.replace(/^[^a-zA-Z]*/, "").split(" ").slice(0, 7).join(" ").toLowerCase();
     q = `Does "${core}" actually move the needle on what you're trying to accomplish?`;
   }
+
+  // Add pain point context if available
+  if (painPoints.length > 0 && !q.includes("?")) {
+    // Ensure q ends with ?
+    q = q.replace(/\?$/, "") + "?";
+  }
+
   // Prefix with persona or company
   if (isB2C && contextDetails)
     return `Given that you're ${firstClause(contextDetails)}: ${q}`;
@@ -1631,6 +1666,12 @@ const buildPlaybookFromBattlecard = (competitor, yourCompany, targetContext) => 
     ? (targetContext.persona_context || "")
     : (targetContext.context || "");
 
+  // Extract research data (pain points, priorities, etc)
+  const painPoints     = targetContext.painPoints || [];
+  const priorities     = targetContext.priorities || [];
+  const industry       = targetContext.industry || null;
+  const companySize    = targetContext.companySize || null;
+
   // Rank all battlecard lists by relevance to the persona/company context
   const keywords        = getContextKeywords(`${contextLabel} ${contextDetails}`);
   const ourName         = yourCompany.company_name || "Us";
@@ -1641,23 +1682,26 @@ const buildPlaybookFromBattlecard = (competitor, yourCompany, targetContext) => 
   const theirPricing    = competitor.pricing   || [];
   const ourPricing      = yourCompany.pricing  || [];
 
-  const positioningAngle   = buildPositioningAngle(differentiators, theirWeaknesses, theirName, ourName, contextLabel, contextDetails, isB2C);
-  const openingHook        = buildOpeningHook(theirName, contextLabel, contextDetails, isB2C);
+  // Pass pain points to all builders for richer context
+  const positioningAngle   = buildPositioningAngle(differentiators, theirWeaknesses, theirName, ourName, contextLabel, contextDetails, isB2C, painPoints);
+  const openingHook        = buildOpeningHook(theirName, contextLabel, contextDetails, isB2C, painPoints);
   const leadWith           = buildLeadWiths(differentiators, contextLabel, contextDetails, isB2C);
   const watchOutFor        = buildWatchOutFor(landmines, differentiators, contextLabel, contextDetails, isB2C);
   const rawQuestions       = differentiators.slice(0, 4)
-    .map(d => differentiatorToQuestion(d, theirName, contextLabel, contextDetails, isB2C));
+    .map(d => differentiatorToQuestion(d, theirName, contextLabel, contextDetails, isB2C, painPoints));
   const discoveryQuestions = [...new Set(rawQuestions)];
   const pricingFrame       = buildPricingNarrative(theirPricing, ourPricing, theirName, ourName, contextLabel, contextDetails, isB2C);
 
   return { competitorName: theirName, yourName: ourName, contextLabel, contextDetails, isB2C,
-           positioningAngle, openingHook, leadWith, watchOutFor, discoveryQuestions, pricingFrame, theirWeaknesses };
+           positioningAngle, openingHook, leadWith, watchOutFor, discoveryQuestions, pricingFrame, theirWeaknesses,
+           painPoints, priorities, industry, companySize };
 };
 
 // Render the cheat-sheet playbook
 const renderSalesPlaybook = (playbook, container) => {
   const { competitorName, yourName, contextLabel, positioningAngle, openingHook,
-          leadWith, watchOutFor, discoveryQuestions, pricingFrame, theirWeaknesses } = playbook;
+          leadWith, watchOutFor, discoveryQuestions, pricingFrame, theirWeaknesses,
+          painPoints = [], priorities = [], industry = null } = playbook;
 
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
@@ -1673,8 +1717,19 @@ const renderSalesPlaybook = (playbook, container) => {
   let html = `<div class="space-y-1 mb-5 text-xs text-slate-500">
     <span class="font-medium text-slate-600">vs ${esc(competitorName)}</span>
     <span class="mx-1.5">·</span>
-    <span>${esc(contextLabel)}</span>
-  </div>`;
+    <span>${esc(contextLabel)}</span>`;
+    if (industry) {
+      html += `<span class="mx-1.5">·</span><span>${esc(industry)}</span>`;
+    }
+  html += `</div>`;
+
+  // 0. Research Context (if available)
+  if (painPoints.length > 0) {
+    const painBody = `<ul class="space-y-1">` +
+      painPoints.slice(0, 3).map(p => `<li class="flex items-start gap-1.5"><span class="text-red-500 mt-0.5">•</span><span>${esc(p)}</span></li>`).join("") +
+      `</ul><p class="mt-2 text-xs text-slate-400 italic">Use this context to frame your messaging.</p>`;
+    html += sectionHTML("🎯", "What Matters Most", painBody);
+  }
 
   // 1. Positioning Angle
   html += sectionHTML("🎯", "Positioning Angle", `<p class="leading-relaxed">${esc(positioningAngle)}</p>`);
@@ -1743,7 +1798,7 @@ const renderSalesPlaybook = (playbook, container) => {
   container.classList.remove("hidden");
 };
 
-const generateSalesPlaybook = (targetCompany, selectedCompetitorName, data) => {
+const generateSalesPlaybook = async (targetCompany, selectedCompetitorName, data) => {
   const resultsContainer = document.getElementById("playbook-results");
   if (!resultsContainer) return;
 
@@ -1754,8 +1809,45 @@ const generateSalesPlaybook = (targetCompany, selectedCompetitorName, data) => {
     return;
   }
 
+  // Show loading state while researching target company/persona
+  resultsContainer.innerHTML = `
+    <div class="text-slate-300 text-sm flex items-center gap-2">
+      <div class="loader" style="width: 16px; height: 16px;"></div>
+      Researching target ${targetCompany.type === "b2c" ? "audience" : "company"}...
+    </div>
+  `;
+  resultsContainer.classList.remove("hidden");
+
+  // Research the target company or persona to get rich context
+  let enrichedTargetData = { ...targetCompany };
+  try {
+    const researchPayload = {
+      research_type: targetCompany.type === "b2c" ? "persona" : "company",
+      query: targetCompany.type === "b2c"
+        ? `${targetCompany.persona_name}: ${targetCompany.persona_context}`
+        : targetCompany.url,
+    };
+
+    const response = await fetch("/api/research", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(researchPayload),
+    });
+
+    if (response.ok) {
+      const research = await response.json();
+      enrichedTargetData.research = research;
+      enrichedTargetData.painPoints = research.pain_points || [];
+      enrichedTargetData.priorities = research.priorities || [];
+      enrichedTargetData.industry = research.industry || null;
+      enrichedTargetData.companySize = research.company_size || null;
+    }
+  } catch (err) {
+    console.warn("Target research failed, proceeding with basic data", err);
+  }
+
   const yourCompany = data.target_company || {};
-  const playbook = buildPlaybookFromBattlecard(competitor, yourCompany, targetCompany);
+  const playbook = buildPlaybookFromBattlecard(competitor, yourCompany, enrichedTargetData);
   renderSalesPlaybook(playbook, resultsContainer);
 };
 
