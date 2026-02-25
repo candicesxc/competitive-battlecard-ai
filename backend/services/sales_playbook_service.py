@@ -49,7 +49,24 @@ class SalesPlaybookService:
         competitor_name = competitor.get("company_name", "Competitor")
         your_name = your_company.get("name", "Our Company")
 
-        return f"""Generate a sales playbook for selling against {competitor_name} to {target_company.get("company_name", "a target company")}.
+        # Determine if this is B2B (company targeting) or B2C (persona targeting)
+        is_b2c = "persona_name" in target_company or "persona_context" in target_company
+
+        if is_b2c:
+            # B2C: Audience persona targeting
+            persona_name = target_company.get("persona_name", "Target Persona")
+            persona_context = target_company.get("persona_context", context or "")
+            target_description = f"a {persona_name} persona"
+            context_str = f"{persona_context} {context}" if context else persona_context
+        else:
+            # B2B: Company targeting
+            target_company_name = target_company.get("company_name", "a target company")
+            industry = target_company.get("industry", "unknown industry")
+            size = target_company.get("size", "unknown size")
+            target_description = f"{target_company_name}"
+            context_str = f"{industry}, {size}. {context}" if context else f"{industry}, {size}"
+
+        return f"""Generate a sales playbook for selling against {competitor_name} to {target_description}.
 
 COMPETITOR: {competitor_name}
 - Weaknesses: {", ".join(competitor.get("weaknesses", [])[:3])}
@@ -58,8 +75,8 @@ COMPETITOR: {competitor_name}
 OUR COMPANY: {your_name}
 - Differentiators: {", ".join(your_company.get("how_we_win", [])[:3])}
 
-TARGET: {target_company.get("industry", "unknown industry")}, {target_company.get("size", "unknown size")}
-CONTEXT: {context or "no additional context"}
+TARGET: {target_description}
+CONTEXT: {context_str or "no additional context"}
 
 Return JSON with objection_handling (common_objections with FEEL-FELT-FOUND and FIA responses, talk_tracks, roi_calculator) and competitive_narrative (positioning_angle, personas with Executive/Technical/Financial narratives, competitive_advantages, case_study_recommendations)."""
 

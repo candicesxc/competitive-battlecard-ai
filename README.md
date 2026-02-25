@@ -28,6 +28,12 @@ The tool is fully deployed and ready to use. Simply paste a company URL to gener
 - 🖼️ **Visual Logos & Company Info** — Each card displays company information and website URLs.
 - 💾 **Save & Reload Battlecards** — Save generated battlecards to your browser and reload them anytime.
 - 📄 **PDF Export** — Download battlecards as formatted PDFs for sharing and documentation.
+- 🎯 **Sales Playbook Generator** — Generate comprehensive sales enablement resources for each competitor:
+  - **Objection Handling** — Common objections with multiple response frameworks (FEEL-FELT-FOUND, FIA)
+  - **Talk Tracks** — Sales stage-specific conversation flows (discovery, demo, close)
+  - **ROI Calculator** — Current state costs, future savings, and cost of delay metrics
+  - **Competitive Narratives** — Buyer-aligned positioning stories by persona (Executive, Technical, Financial)
+  - **B2B & B2C Support** — Target specific companies (B2B) or audience personas (B2C)
 - 💬 **CrewAI Integration** — Coordinates multiple agents (research, analysis, summarization).
 - 🌈 **Modern UI** — Beautiful interface styled with Tailwind CSS and smooth animations.
 
@@ -59,6 +65,7 @@ backend/
 │   ├── exa_competitor_search.py
 │   ├── layout_service.py
 │   ├── search_service.py
+│   ├── sales_playbook_service.py # Sales playbook generation
 │   └── cache.py
 └── models/
     └── company_profile.py
@@ -153,6 +160,27 @@ runtime.txt            # Python runtime version
 - Scores competitors based on similarity and relevance
 - Filters and ranks results for the most relevant matches
 
+### Sales Playbook Generator
+After generating a battlecard, you can create comprehensive sales enablement resources:
+
+**How to Use:**
+1. Generate a battlecard for a company
+2. Click "Generate Sales Playbook" button at the bottom of results
+3. Choose your selling approach:
+   - **B2B**: Enter the target company URL (or just context)
+   - **B2C**: Enter the audience persona you're targeting
+4. Select a competitor from the dropdown
+5. Click "Generate Playbook" and wait for AI-powered content (5-10 seconds)
+
+**What You Get:**
+- **Objection Handling** (5-7 common objections with 2-3 response frameworks each)
+- **Talk Tracks** (discovery, demo, close stage scripts)
+- **ROI Calculator** (current state cost, future savings, cost of delay)
+- **Competitive Narratives** (positioning angles for Executive, Technical, and Financial personas)
+- **Case Study Recommendations** (which case studies to use for this scenario)
+
+All content is copy-paste ready for Slack, email, or real-time sales conversations.
+
 ---
 
 ## 🔧 Development
@@ -162,6 +190,25 @@ runtime.txt            # Python runtime version
 - `POST /analyze` - Analyze a company URL and generate battlecards
   - Request body: `{ "url": "https://example.com" }`
   - Returns: Battlecard data with competitors and analysis
+
+- `POST /next-steps` - Generate comprehensive sales playbook for a competitor vs. target
+  - Request body (B2B):
+    ```json
+    {
+      "target_company": { "url": "https://target.com", "context": "optional context" },
+      "competitor": { "company_name": "...", "weaknesses": [...], "pricing": [...] },
+      "your_company": { "name": "...", "how_we_win": [...] }
+    }
+    ```
+  - Request body (B2C):
+    ```json
+    {
+      "target_company": { "persona_name": "Marketing Manager", "persona_context": "SMB..." },
+      "competitor": { "company_name": "...", "weaknesses": [...] },
+      "your_company": { "name": "...", "how_we_win": [...] }
+    }
+    ```
+  - Returns: Comprehensive playbook with objections, narratives, ROI, and case studies
 
 ### Frontend Structure
 
