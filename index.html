@@ -129,37 +129,36 @@
         </div>
       </div>
 
-      <!-- Market Category & Tabs (Market Overview / Target Company) -->
-      <div class="flex-shrink-0 bg-slate-900/50 border-b border-slate-700/50 px-4 py-3 sm:px-6 lg:px-8">
-        <div id="market-category" class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
-          <!-- Market category (e.g., "Cybersecurity", "SaaS") inserted here -->
-        </div>
-        <div class="flex gap-2">
-          <button id="tab-market-overview" class="px-3 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700 hover:border-slate-600 hover:bg-slate-700/50 transition-all active-tab" data-tab="market-overview">
-            Market Overview
-          </button>
-          <button id="tab-target-profile" class="px-3 py-2 text-sm font-medium text-slate-400 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-slate-600 hover:bg-slate-700/50 transition-all" data-tab="target-profile">
-            Target Profile
-          </button>
-        </div>
-      </div>
-
-      <!-- Content Area: Tabs + Sidebar + Main -->
+      <!-- Content Area: Sidebar + Main -->
       <div class="flex-1 flex overflow-hidden">
-        <!-- Tab Content Panel (Market Overview / Target Profile) - Left side -->
-        <div id="tab-content-panel" class="w-60 flex-shrink-0 bg-slate-900 border-r border-slate-700/50 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-800 flex flex-col">
-          <!-- Market Overview Tab -->
-          <div id="market-overview-content" class="p-4 text-sm text-slate-300 space-y-4">
-            <!-- Market summary text inserted here -->
-          </div>
-          <!-- Target Profile Tab (hidden by default) -->
-          <div id="target-profile-content" class="hidden p-4 text-sm text-slate-300 space-y-4">
-            <!-- Target company profile inserted here -->
-          </div>
-        </div>
-
-        <!-- Competitors Sidebar -->
+        <!-- Competitors Sidebar (includes collapsible market/target tabs) -->
         <aside id="competitors-sidebar" class="w-60 flex-shrink-0 bg-slate-900 border-r border-slate-700/50 flex flex-col overflow-hidden">
+          <!-- Collapsible Market Overview / Target Profile Section -->
+          <div class="flex-shrink-0 bg-slate-800/50 border-b border-slate-700/30">
+            <button id="toggle-market-section" class="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-800/70 transition-all" title="Toggle market and company info">
+              <div class="flex items-center gap-2 flex-1">
+                <svg id="market-toggle-icon" class="w-4 h-4 text-slate-400 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+                <span id="market-category" class="text-xs font-semibold text-slate-400">Market Overview</span>
+              </div>
+            </button>
+            <!-- Collapsible Content -->
+            <div id="market-section-content" class="hidden max-h-0 overflow-hidden transition-all">
+              <div class="px-4 py-3 border-t border-slate-700/30 space-y-3 text-xs text-slate-300 max-h-48 overflow-y-auto">
+                <div>
+                  <div class="font-semibold text-slate-200 mb-2">📊 Market</div>
+                  <div id="market-overview-content" class="text-slate-400"></div>
+                </div>
+                <div class="border-t border-slate-700/30 pt-3">
+                  <div class="font-semibold text-slate-200 mb-2">🎯 Target</div>
+                  <div id="target-profile-content" class="text-slate-400"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Competitors Header -->
           <div class="flex-shrink-0 border-b border-slate-700/30 px-4 py-3">
             <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">Competitors</h3>
           </div>

@@ -767,54 +767,33 @@ const renderBattlecards = (data, companyUrl = null) => {
     marketCategory.textContent = firstWords || "Market Overview";
   }
 
-  // Render Market Overview in tab
+  // Render Market Overview
   const marketOverviewContent = document.getElementById("market-overview-content");
   if (marketOverviewContent) {
-    marketOverviewContent.innerHTML = data.market_summary ? `<p class="leading-relaxed">${data.market_summary}</p>` : "<p class=\"text-slate-500\">No market summary available.</p>";
+    marketOverviewContent.innerHTML = data.market_summary ? `<p class="text-xs leading-relaxed">${data.market_summary}</p>` : "<p class=\"text-slate-500 text-xs\">No market summary available.</p>";
   }
 
-  // Render Target Company Profile in tab
+  // Render Target Company Profile
   const targetProfileContent = document.getElementById("target-profile-content");
-  if (targetProfileContent && (target.overview || target.products?.length || target.strengths?.length || target.weaknesses?.length || target.pricing?.length)) {
+  if (targetProfileContent) {
     targetProfileContent.innerHTML = "";
-    const profileDiv = document.createElement("div");
-    profileDiv.className = "space-y-4";
-
-    if (target.overview) {
-      const ovDiv = document.createElement("div");
-      ovDiv.innerHTML = `<div class="font-semibold text-slate-100 mb-1">Overview</div><p class="text-sm text-slate-400 leading-relaxed">${target.overview}</p>`;
-      profileDiv.appendChild(ovDiv);
+    if (target.overview || target.products?.length || target.strengths?.length || target.weaknesses?.length || target.pricing?.length) {
+      let html = "";
+      if (target.overview) {
+        html += `<div><strong class="text-slate-200">${target.company_name}</strong><p class="text-xs mt-1">${target.overview}</p></div>`;
+      }
+      if (target.strengths?.length) {
+        html += `<div><strong class="text-slate-200">Strengths:</strong><ul class="text-xs space-y-0.5 mt-1">` +
+          target.strengths.slice(0, 3).map(s => `<li>• ${s}</li>`).join("") + `</ul></div>`;
+      }
+      if (target.weaknesses?.length) {
+        html += `<div><strong class="text-slate-200">Weaknesses:</strong><ul class="text-xs space-y-0.5 mt-1">` +
+          target.weaknesses.slice(0, 2).map(w => `<li>• ${w}</li>`).join("") + `</ul></div>`;
+      }
+      targetProfileContent.innerHTML = html;
+    } else {
+      targetProfileContent.innerHTML = `<p class="text-slate-500 text-xs">No company profile available.</p>`;
     }
-
-    if (target.strengths?.length) {
-      const strDiv = document.createElement("div");
-      strDiv.innerHTML = `<div class="font-semibold text-slate-100 mb-2">💪 Strengths</div><ul class="text-sm text-slate-300 space-y-1 list-disc list-inside">` +
-        target.strengths.map(s => `<li>${s}</li>`).join("") + `</ul>`;
-      profileDiv.appendChild(strDiv);
-    }
-
-    if (target.weaknesses?.length) {
-      const weakDiv = document.createElement("div");
-      weakDiv.innerHTML = `<div class="font-semibold text-slate-100 mb-2">⚠️ Weaknesses</div><ul class="text-sm text-slate-300 space-y-1 list-disc list-inside">` +
-        target.weaknesses.map(w => `<li>${w}</li>`).join("") + `</ul>`;
-      profileDiv.appendChild(weakDiv);
-    }
-
-    if (target.products?.length) {
-      const prodDiv = document.createElement("div");
-      prodDiv.innerHTML = `<div class="font-semibold text-slate-100 mb-2">📦 Products</div><ul class="text-sm text-slate-300 space-y-1 list-disc list-inside">` +
-        target.products.map(p => `<li>${p}</li>`).join("") + `</ul>`;
-      profileDiv.appendChild(prodDiv);
-    }
-
-    if (target.pricing?.length) {
-      const pricingDiv = document.createElement("div");
-      pricingDiv.innerHTML = `<div class="font-semibold text-slate-100 mb-2">💰 Pricing</div><ul class="text-sm text-slate-300 space-y-1 list-disc list-inside">` +
-        target.pricing.map(pr => `<li>${pr}</li>`).join("") + `</ul>`;
-      profileDiv.appendChild(pricingDiv);
-    }
-
-    targetProfileContent.appendChild(profileDiv);
   }
 
   // Render competitors list in sidebar
@@ -1714,35 +1693,24 @@ if (selectors.downloadPdfBtnSidebar) {
   selectors.downloadPdfBtnSidebar.addEventListener("click", handlePdfDownload);
 }
 
-// Set up tab switching for Market Overview / Target Profile
-const tabMarketBtn = document.getElementById("tab-market-overview");
-const tabTargetBtn = document.getElementById("tab-target-profile");
-const marketContent = document.getElementById("market-overview-content");
-const targetContent = document.getElementById("target-profile-content");
+// Set up collapsible market section toggle
+const toggleMarketBtn = document.getElementById("toggle-market-section");
+const marketSectionContent = document.getElementById("market-section-content");
+const marketToggleIcon = document.getElementById("market-toggle-icon");
 
-if (tabMarketBtn && tabTargetBtn && marketContent && targetContent) {
-  const switchTab = (tabName) => {
-    if (tabName === "market-overview") {
-      marketContent.classList.remove("hidden");
-      targetContent.classList.add("hidden");
-      tabMarketBtn.classList.add("active-tab");
-      tabTargetBtn.classList.remove("active-tab");
-      // Update button styling
-      tabMarketBtn.className = "px-3 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700 hover:border-slate-600 hover:bg-slate-700/50 transition-all active-tab";
-      tabTargetBtn.className = "px-3 py-2 text-sm font-medium text-slate-400 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-slate-600 hover:bg-slate-700/50 transition-all";
+if (toggleMarketBtn && marketSectionContent) {
+  toggleMarketBtn.addEventListener("click", () => {
+    const isHidden = marketSectionContent.classList.contains("hidden");
+    if (isHidden) {
+      marketSectionContent.classList.remove("hidden");
+      marketSectionContent.style.maxHeight = "none";
+      marketToggleIcon.style.transform = "rotate(180deg)";
     } else {
-      marketContent.classList.add("hidden");
-      targetContent.classList.remove("hidden");
-      tabMarketBtn.classList.remove("active-tab");
-      tabTargetBtn.classList.add("active-tab");
-      // Update button styling
-      tabMarketBtn.className = "px-3 py-2 text-sm font-medium text-slate-400 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-slate-600 hover:bg-slate-700/50 transition-all";
-      tabTargetBtn.className = "px-3 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700 hover:border-slate-600 hover:bg-slate-700/50 transition-all active-tab";
+      marketSectionContent.classList.add("hidden");
+      marketSectionContent.style.maxHeight = "0";
+      marketToggleIcon.style.transform = "rotate(0deg)";
     }
-  };
-
-  tabMarketBtn.addEventListener("click", () => switchTab("market-overview"));
-  tabTargetBtn.addEventListener("click", () => switchTab("target-profile"));
+  });
 }
 
 window.renderBattlecards = renderBattlecards;
