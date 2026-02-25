@@ -803,11 +803,14 @@ const renderBattlecards = (data, companyUrl = null) => {
   void selectors.results.offsetWidth;
   selectors.results.classList.add("fade-in");
 
+  // Initialize next steps (sales playbook) feature
+  initializeNextSteps(data);
+
   // Save battlecard to localStorage and update current battlecard state
   if (typeof normalizeBattlecardData !== 'undefined') {
     const normalized = normalizeBattlecardData(data, companyUrl || selectors.urlInput?.value || "");
     currentBattlecard = normalized;
-    
+
     // Save to localStorage
     if (typeof saveBattlecard !== 'undefined') {
       saveBattlecard(normalized);
@@ -1302,6 +1305,7 @@ if (document.readyState === 'loading') {
 if (selectors.downloadPdfBtn) {
   selectors.downloadPdfBtn.addEventListener("click", handlePdfDownload);
 }
+
 
 window.renderBattlecards = renderBattlecards;
 
