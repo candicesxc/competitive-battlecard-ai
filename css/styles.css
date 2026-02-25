@@ -586,11 +586,9 @@ body {
   color: #c7d2fe;
 }
 
-/* Loading state styling */
+/* Loading state — flex-shrink-0 at bottom of start-screen flex column, always in viewport */
 #loading-state {
-  position: sticky;
-  top: 0;
-  z-index: 40;
+  /* no positioning needed; the flex layout keeps it in-frame */
 }
 
 /* Mobile Responsive Styles */
