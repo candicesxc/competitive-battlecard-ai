@@ -1433,7 +1433,7 @@ const initializeNextSteps = (battlecard) => {
 
   // Set up generate button handler (only once to avoid duplicate handlers)
   if (!generateBtn.dataset.initialized) {
-    generateBtn.addEventListener("click", async () => {
+    generateBtn.addEventListener("click", () => {
       // Detect B2B vs B2C mode
       const segmentType = document.querySelector("input[name='segment-type']:checked")?.value || "b2b";
       let targetCompanyData = {};
@@ -1464,204 +1464,238 @@ const initializeNextSteps = (battlecard) => {
         return;
       }
 
-      await generateSalesPlaybook(
-        targetCompanyData,
-        selectedCompetitorName,
-        data  // Use the raw data object with competitors
-      );
+      generateSalesPlaybook(targetCompanyData, selectedCompetitorName, data);
     });
     generateBtn.dataset.initialized = "true";
   }
 };
 
-const generateSalesPlaybook = async (targetCompany, selectedCompetitorName, data) => {
+// ─── Playbook: build entirely from existing battlecard data, no API call ─────
+
+const extractDomain = (url = "") => {
+  try { return new URL(url.startsWith("http") ? url : `https://${url}`).hostname.replace("www.", ""); }
+  catch { return url; }
+};
+
+// Turn a differentiator bullet into a discovery question the rep can ask
+const differentiatorToQuestion = (diff, competitorName) => {
+  const l = diff.toLowerCase();
+  // Pattern matching to produce natural questions
+  if (l.includes("accredit") || l.includes("recogni") || l.includes("verif"))
+    return "Does the credential you earn need to be verifiable by an employer, or is personal development the goal?";
+  if (l.includes("certif") || l.includes("certificate"))
+    return "Have you looked at whether the certifications offered are recognized by the specific companies you want to work with?";
+  if (l.includes("degree") || l.includes("universit") || l.includes("academic"))
+    return "Is a university-backed degree on the table, or are you looking for something shorter?";
+  if (l.includes("employer") || l.includes("hire") || l.includes("hir") || l.includes("job pipeline"))
+    return "Are you measuring success by the job or promotion you land — or just by completing the course?";
+  if (l.includes("ai") || l.includes("deepfake") || l.includes("phish") || l.includes("threat"))
+    return "Is the training you're evaluating built for the threats you're facing today, or is it curriculum from a few years ago?";
+  if (l.includes("adaptive") || l.includes("personaliz") || l.includes("tailor"))
+    return "Does the platform adapt to each learner, or is everyone getting the same content regardless of where they are?";
+  if (l.includes("price") || l.includes("cost") || l.includes("roi") || l.includes("invest"))
+    return "When you're comparing costs, are you comparing what each option actually produces — not just the subscription fee?";
+  if (l.includes("support") || l.includes("integrat") || l.includes("onboard"))
+    return "What does the vendor's support look like after you sign — and how long does it take to see results?";
+  if (l.includes("partner") || l.includes("google") || l.includes("ibm") || l.includes("microsoft"))
+    return "Are the companies that designed this curriculum ones your prospects or employers would recognize by name?";
+  // Generic fallback: pull first 8 words as context
+  const core = diff.replace(/^[^a-zA-Z]*/, "").split(" ").slice(0, 7).join(" ").toLowerCase();
+  return `Have you evaluated how "${core}" holds up against what you actually need to accomplish?`;
+};
+
+// Build the pricing narrative from both pricing arrays
+const buildPricingNarrative = (theirPricing, ourPricing, theirName, ourName) => {
+  const theirLine = theirPricing[0] || null;
+  const ourLine = ourPricing[0] || null;
+  if (!theirLine && !ourLine) return null;
+  let narrative = "";
+  if (theirLine) narrative += `**${theirName}:** ${theirLine}`;
+  if (theirLine && ourLine) narrative += `\n**${ourName}:** ${ourLine}`;
+  else if (ourLine) narrative += `**${ourName}:** ${ourLine}`;
+  // Add remaining pricing tiers
+  const extras = [
+    ...theirPricing.slice(1).map(p => `${theirName}: ${p}`),
+    ...ourPricing.slice(1).map(p => `${ourName}: ${p}`)
+  ];
+  if (extras.length) narrative += `\n${extras.join(" · ")}`;
+  return narrative;
+};
+
+// Build a one-paragraph positioning angle from differentiators + their first weakness
+const buildPositioningAngle = (differentiators, theirWeaknesses, theirName, ourName, contextLabel) => {
+  const d1 = differentiators[0] || "";
+  const d2 = differentiators[1] || "";
+  const w1 = theirWeaknesses[0] || "";
+  let angle = "";
+  if (d1) angle += `${d1}.`;
+  if (w1) angle += ` Meanwhile, ${theirName} ${w1.charAt(0).toLowerCase() + w1.slice(1)}`.replace(/\.$/, "") + ".";
+  if (d2 && d2 !== d1) angle += ` ${d2}.`;
+  return angle.trim() || `${ourName} has measurable advantages over ${theirName} for ${contextLabel}.`;
+};
+
+// Build the playbook data structure from existing battlecard fields
+const buildPlaybookFromBattlecard = (competitor, yourCompany, targetContext) => {
+  const differentiators = competitor.how_we_win || [];
+  const landmines      = competitor.potential_landmines || [];
+  const theirStrengths = competitor.strengths || [];
+  const theirWeaknesses = competitor.weaknesses || [];
+  const theirPricing   = competitor.pricing || [];
+  const ourPricing     = yourCompany.pricing || [];
+  const ourName        = yourCompany.company_name || "Us";
+  const theirName      = competitor.company_name || "Competitor";
+
+  const isB2C = targetContext.type === "b2c";
+  const contextLabel = isB2C
+    ? (targetContext.persona_name || "your prospect")
+    : (targetContext.url ? extractDomain(targetContext.url) : "the prospect");
+  const contextDetails = isB2C
+    ? (targetContext.persona_context || "")
+    : (targetContext.context || "");
+
+  // Positioning angle: first 2 differentiators + their first weakness
+  const positioningAngle = buildPositioningAngle(differentiators, theirWeaknesses, theirName, ourName, contextLabel);
+
+  // Opening hook: first differentiator turned into an opening question
+  const openingHook = differentiators[0]
+    ? differentiatorToQuestion(differentiators[0], theirName)
+    : `What's the biggest gap you've found with ${theirName}?`;
+
+  // Lead-withs: all differentiators as bullet points for the opener
+  const leadWith = differentiators;
+
+  // Watch Out For: each landmine paired with a counter from differentiators
+  const watchOutFor = landmines.map((landmine, i) => ({
+    landmine,
+    counter: differentiators[i % Math.max(differentiators.length, 1)] ||
+             `Focus on ${ourName}'s core differentiators to counter this.`
+  }));
+
+  // Discovery questions: each differentiator → qualifying question
+  const discoveryQuestions = differentiators.slice(0, 4).map(d => differentiatorToQuestion(d, theirName));
+
+  // Pricing narrative
+  const pricingFrame = buildPricingNarrative(theirPricing, ourPricing, theirName, ourName);
+
+  return {
+    competitorName: theirName,
+    yourName: ourName,
+    contextLabel,
+    contextDetails,
+    isB2C,
+    positioningAngle,
+    openingHook,
+    leadWith,
+    watchOutFor,
+    discoveryQuestions: [...new Set(discoveryQuestions)], // deduplicate
+    pricingFrame,
+    theirWeaknesses,
+  };
+};
+
+// Render the cheat-sheet playbook
+const renderSalesPlaybook = (playbook, container) => {
+  const { competitorName, yourName, contextLabel, positioningAngle, openingHook,
+          leadWith, watchOutFor, discoveryQuestions, pricingFrame, theirWeaknesses } = playbook;
+
+  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+  const sectionHTML = (emoji, title, body) => `
+    <div class="mb-6 rounded-xl border border-slate-200/60 bg-white/95 shadow-sm overflow-hidden">
+      <div class="flex items-center gap-2 px-5 py-3.5 border-b border-slate-100 bg-slate-50/80">
+        <span class="text-base">${emoji}</span>
+        <span class="text-sm font-semibold text-slate-700">${title}</span>
+      </div>
+      <div class="px-5 py-4 text-sm text-slate-600 space-y-2">${body}</div>
+    </div>`;
+
+  let html = `<div class="space-y-1 mb-5 text-xs text-slate-500">
+    <span class="font-medium text-slate-600">vs ${esc(competitorName)}</span>
+    <span class="mx-1.5">·</span>
+    <span>${esc(contextLabel)}</span>
+  </div>`;
+
+  // 1. Positioning Angle
+  html += sectionHTML("🎯", "Positioning Angle", `<p class="leading-relaxed">${esc(positioningAngle)}</p>`);
+
+  // 2. How to Open the Conversation
+  let openBody = `<p class="italic text-slate-700 border-l-2 border-indigo-300 pl-3 mb-3">${esc(openingHook)}</p>`;
+  if (leadWith.length) {
+    openBody += `<p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Lead with:</p>
+      <ul class="space-y-1">` +
+      leadWith.map(d => `<li class="flex items-start gap-1.5"><span class="text-indigo-400 mt-0.5">•</span><span>${esc(d)}</span></li>`).join("") +
+      `</ul>`;
+  }
+  html += sectionHTML("🚀", "How to Open the Conversation", openBody);
+
+  // 3. Watch Out For
+  if (watchOutFor.length) {
+    let watchBody = `<table class="w-full text-xs border-collapse">
+      <thead><tr class="text-left border-b border-slate-200">
+        <th class="pb-2 pr-3 font-semibold text-slate-500 w-2/5">Landmine to watch for</th>
+        <th class="pb-2 font-semibold text-slate-500">Your counter</th>
+      </tr></thead>
+      <tbody class="divide-y divide-slate-100">` +
+      watchOutFor.map(({ landmine, counter }) =>
+        `<tr>
+          <td class="py-2.5 pr-3 text-slate-600 align-top">${esc(landmine)}</td>
+          <td class="py-2.5 text-slate-600 align-top">${esc(counter)}</td>
+        </tr>`
+      ).join("") +
+      `</tbody></table>`;
+    html += sectionHTML("⚠️", "Watch Out For (Potential Landmines)", watchBody);
+  }
+
+  // 4. Discovery Questions
+  if (discoveryQuestions.length) {
+    const qBody = `<ul class="space-y-2">` +
+      discoveryQuestions.map(q => `<li class="flex items-start gap-1.5">
+        <span class="text-emerald-500 font-bold mt-0.5">?</span>
+        <span>${esc(q)}</span></li>`).join("") +
+      `</ul>`;
+    html += sectionHTML("🔍", "Discovery Questions", qBody);
+  }
+
+  // 5. Objection Responses (from their weaknesses)
+  if (theirWeaknesses.length) {
+    const objBody = `<ul class="space-y-2.5">` +
+      theirWeaknesses.map(w => `<li class="flex items-start gap-2">
+        <span class="text-amber-500 mt-0.5 flex-shrink-0">▶</span>
+        <span><span class="font-medium text-slate-700">If they bring up a ${esc(competitorName)} strength —</span> ${esc(w)}</span>
+      </li>`).join("") +
+      `</ul>`;
+    html += sectionHTML("💬", "Objection Responses", objBody);
+  }
+
+  // 6. Pricing / ROI
+  if (pricingFrame) {
+    const rows = pricingFrame.split("\n").map(line => {
+      const bold = line.replace(/\*\*(.+?)\*\*/g, '<span class="font-semibold text-slate-700">$1</span>');
+      return `<p class="leading-relaxed">${bold}</p>`;
+    }).join("");
+    const pricingBody = rows +
+      `<p class="mt-3 text-xs text-slate-400 italic">Don't just echo the number — frame it as value delivered per dollar.</p>`;
+    html += sectionHTML("💰", "Pricing / ROI Framing", pricingBody);
+  }
+
+  container.innerHTML = html;
+  container.classList.remove("hidden");
+};
+
+const generateSalesPlaybook = (targetCompany, selectedCompetitorName, data) => {
   const resultsContainer = document.getElementById("playbook-results");
   if (!resultsContainer) return;
 
-  try {
-    // Find the selected competitor in the data
-    const competitor = data.competitors.find(c => c.company_name === selectedCompetitorName);
-    if (!competitor) {
-      console.error(`Competitor "${selectedCompetitorName}" not found. Available: ${data.competitors.map(c => c.company_name).join(", ")}`);
-      alert(`Competitor "${selectedCompetitorName}" not found`);
-      return;
-    }
-
-    // Show loading state
-    resultsContainer.innerHTML = '<div class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700"><strong>Generating playbook...</strong> Please wait.</div>';
+  const competitor = data.competitors.find(c => c.company_name === selectedCompetitorName);
+  if (!competitor) {
+    resultsContainer.innerHTML = `<p class="text-red-500 text-sm">Competitor "${selectedCompetitorName}" not found in battlecard data.</p>`;
     resultsContainer.classList.remove("hidden");
-
-    // Build request payload
-    const payload = {
-      competitor: competitor,
-      your_company: {
-        name: data.target_company?.company_name || "Our Company",
-        how_we_win: data.target_company?.how_we_win || [],
-        pricing: data.target_company?.pricing || []
-      }
-    };
-
-    // Add target company data based on B2B/B2C type
-    if (targetCompany.type === "b2c") {
-      payload.target_company = {
-        persona_name: targetCompany.persona_name,
-        persona_context: targetCompany.persona_context,
-        context: targetCompany.persona_context
-      };
-    } else {
-      payload.target_company = {
-        url: targetCompany.url,
-        context: targetCompany.context
-      };
-    }
-
-    // Call backend to generate playbook
-    const response = await fetch(`${BACKEND_BASE_URL}/next-steps`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.detail || `Failed to generate playbook (${response.status})`);
-    }
-
-    const playbookData = await response.json();
-    renderSalesPlaybook(playbookData, resultsContainer);
-  } catch (error) {
-    console.error("Error generating sales playbook:", error);
-    resultsContainer.innerHTML = `<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><strong>Error:</strong> ${error.message}</div>`;
-    resultsContainer.classList.remove("hidden");
-  }
-};
-
-const renderSalesPlaybook = (data, container) => {
-  container.innerHTML = "";
-
-  // Create collapsible sections for each part of the playbook
-  const sections = [];
-
-  // Objection Handling Section
-  if (data.objection_handling?.common_objections) {
-    const objectionSection = document.createElement("details");
-    objectionSection.className = "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm shadow-md overflow-hidden mb-4";
-    objectionSection.open = true;
-
-    const summary = document.createElement("summary");
-    summary.className = "flex items-center justify-between px-6 py-4 cursor-pointer select-none list-none font-semibold text-slate-700 hover:bg-slate-50 transition-colors";
-    summary.innerHTML = `<span class="flex items-center gap-2">🎯 Objection Handling (${data.objection_handling.common_objections.length} objections)</span>`;
-
-    const content = document.createElement("div");
-    content.className = "px-6 pb-6 pt-1 space-y-4";
-
-    data.objection_handling.common_objections.forEach((obj, idx) => {
-      const objDiv = document.createElement("div");
-      objDiv.className = "pb-4 border-b border-slate-200 last:border-0";
-
-      let objContent = `<div class="font-medium text-slate-700 mb-2">❓ ${obj.objection}</div>`;
-      objContent += `<div class="text-xs text-slate-500 mb-2">Category: ${obj.objection_category}</div>`;
-
-      if (obj.responses && obj.responses.length > 0) {
-        objContent += `<div class="space-y-2 mb-2">`;
-        obj.responses.forEach((resp, respIdx) => {
-          objContent += `<div class="text-sm bg-indigo-50 rounded p-2 border-l-2 border-indigo-300">
-            <span class="font-semibold text-indigo-700">${resp.framework}:</span>
-            <p class="text-slate-600 mt-1">${resp.response}</p>
-          </div>`;
-        });
-        objContent += `</div>`;
-      }
-
-      if (obj.success_rate_note) {
-        objContent += `<div class="text-xs text-emerald-600">✓ ${obj.success_rate_note}</div>`;
-      }
-
-      objDiv.innerHTML = objContent;
-      content.appendChild(objDiv);
-    });
-
-    // Add ROI Calculator if available
-    if (data.objection_handling.roi_calculator) {
-      const roiDiv = document.createElement("div");
-      roiDiv.className = "mt-4 pt-4 border-t border-slate-200";
-      roiDiv.innerHTML = `
-        <div class="font-medium text-slate-700 mb-2">💰 ROI Calculator</div>
-        <div class="text-sm space-y-1 bg-emerald-50 rounded p-3">
-          <div><span class="font-medium">Current State Cost:</span> ${data.objection_handling.roi_calculator.current_state_cost}</div>
-          <div><span class="font-medium">Future Savings:</span> ${data.objection_handling.roi_calculator.future_state_savings}</div>
-          <div><span class="font-medium">Cost of Delay:</span> ${data.objection_handling.roi_calculator.cost_of_delay}</div>
-        </div>
-      `;
-      content.appendChild(roiDiv);
-    }
-
-    objectionSection.appendChild(summary);
-    objectionSection.appendChild(content);
-    sections.push(objectionSection);
+    return;
   }
 
-  // Competitive Narrative Section
-  if (data.competitive_narrative) {
-    const narrativeSection = document.createElement("details");
-    narrativeSection.className = "rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-sm shadow-md overflow-hidden mb-4";
-    narrativeSection.open = true;
-
-    const summary = document.createElement("summary");
-    summary.className = "flex items-center justify-between px-6 py-4 cursor-pointer select-none list-none font-semibold text-slate-700 hover:bg-slate-50 transition-colors";
-    summary.innerHTML = `<span class="flex items-center gap-2">📖 Competitive Narrative</span>`;
-
-    const content = document.createElement("div");
-    content.className = "px-6 pb-6 pt-1 space-y-4";
-
-    if (data.competitive_narrative.positioning_angle) {
-      const angleDiv = document.createElement("div");
-      angleDiv.className = "pb-4 border-b border-slate-200";
-      angleDiv.innerHTML = `
-        <div class="font-medium text-slate-700 mb-2">🎯 Positioning Angle</div>
-        <p class="text-sm text-slate-600">${data.competitive_narrative.positioning_angle}</p>
-      `;
-      content.appendChild(angleDiv);
-    }
-
-    if (data.competitive_narrative.buyer_aligned_story) {
-      const storyDiv = document.createElement("div");
-      storyDiv.className = "pb-4 border-b border-slate-200";
-      storyDiv.innerHTML = `
-        <div class="font-medium text-slate-700 mb-2">💬 Buyer-Aligned Story</div>
-        <p class="text-sm text-slate-600">${data.competitive_narrative.buyer_aligned_story}</p>
-      `;
-      content.appendChild(storyDiv);
-    }
-
-    // Persona-specific narratives
-    if (data.competitive_narrative.personas && data.competitive_narrative.personas.length > 0) {
-      const personasDiv = document.createElement("div");
-      personasDiv.className = "pb-4 border-b border-slate-200";
-      personasDiv.innerHTML = `<div class="font-medium text-slate-700 mb-3">👥 By Stakeholder Type</div>`;
-
-      data.competitive_narrative.personas.forEach(persona => {
-        const personaDiv = document.createElement("div");
-        personaDiv.className = "mb-3 p-3 rounded bg-slate-50 border-l-2 border-slate-300";
-        personaDiv.innerHTML = `
-          <div class="font-semibold text-slate-700">${persona.persona}</div>
-          <p class="text-sm text-slate-600 mt-1">${persona.narrative}</p>
-          ${persona.key_points ? `<div class="text-xs text-slate-500 mt-2"><strong>Key points:</strong> ${persona.key_points.join(", ")}</div>` : ""}
-        `;
-        personasDiv.appendChild(personaDiv);
-      });
-
-      content.appendChild(personasDiv);
-    }
-
-    narrativeSection.appendChild(summary);
-    narrativeSection.appendChild(content);
-    sections.push(narrativeSection);
-  }
-
-  // Add all sections to container
-  sections.forEach(section => container.appendChild(section));
-  toggleClass(container, "hidden", false);
+  const yourCompany = data.target_company || {};
+  const playbook = buildPlaybookFromBattlecard(competitor, yourCompany, targetCompany);
+  renderSalesPlaybook(playbook, resultsContainer);
 };
 
 if (selectors.form) {
