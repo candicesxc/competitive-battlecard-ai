@@ -1042,15 +1042,25 @@ if (selectors.urlInput) {
 // ====== NEXT STEPS / SALES PLAYBOOK SECTION ======
 
 const initializeNextSteps = (battlecard) => {
-  if (!battlecard || !battlecard.competitors || battlecard.competitors.length === 0) {
+  // Handle normalized battlecard that stores raw data in rawData property
+  const data = (battlecard && battlecard.rawData) ? battlecard.rawData : battlecard;
+
+  if (!data || !data.competitors || data.competitors.length === 0) {
     console.log("initializeNextSteps: No competitors found");
     return;
   }
 
+  const expandPlaybookBtn = document.getElementById("expand-playbook-btn");
   const nextStepsContainer = document.getElementById("next-steps-container");
   const competitorSelect = document.getElementById("playbook-competitor-select");
   const generateBtn = document.getElementById("generate-playbook-btn");
+  const collapseBtn = document.getElementById("collapse-playbook-btn");
+  const segmentToggles = document.querySelectorAll(".segment-toggle");
 
+  if (!expandPlaybookBtn) {
+    console.error("expandPlaybookBtn not found");
+    return;
+  }
   if (!nextStepsContainer) {
     console.error("nextStepsContainer not found");
     return;
@@ -1064,80 +1074,153 @@ const initializeNextSteps = (battlecard) => {
     return;
   }
 
-  console.log("Initializing next steps with", battlecard.competitors.length, "competitors");
+  console.log("Initializing next steps with", data.competitors.length, "competitors");
 
-  // Clear any existing options (except the first two)
-  while (competitorSelect.options.length > 2) {
+  // Set up expand button handler
+  if (!expandPlaybookBtn.dataset.initialized) {
+    expandPlaybookBtn.addEventListener("click", () => {
+      nextStepsContainer.classList.remove("hidden");
+      expandPlaybookBtn.classList.add("hidden");
+    });
+    expandPlaybookBtn.dataset.initialized = "true";
+  }
+
+  // Set up collapse button handler
+  if (collapseBtn && !collapseBtn.dataset.initialized) {
+    collapseBtn.addEventListener("click", () => {
+      nextStepsContainer.classList.add("hidden");
+      expandPlaybookBtn.classList.remove("hidden");
+      // Clear results when collapsing
+      const resultsContainer = document.getElementById("playbook-results");
+      if (resultsContainer) {
+        resultsContainer.innerHTML = "";
+        resultsContainer.classList.add("hidden");
+      }
+    });
+    collapseBtn.dataset.initialized = "true";
+  }
+
+  // Set up B2B/B2C toggle handlers
+  segmentToggles.forEach(toggle => {
+    if (!toggle.dataset.initialized) {
+      toggle.addEventListener("change", (e) => {
+        const b2bSection = document.getElementById("b2b-section");
+        const b2cSection = document.getElementById("b2c-section");
+
+        if (e.target.value === "b2b") {
+          b2bSection?.classList.remove("hidden");
+          b2cSection?.classList.add("hidden");
+        } else if (e.target.value === "b2c") {
+          b2bSection?.classList.add("hidden");
+          b2cSection?.classList.remove("hidden");
+        }
+      });
+      toggle.dataset.initialized = "true";
+    }
+  });
+
+  // Clear any existing options (except the first placeholder)
+  while (competitorSelect.options.length > 1) {
     competitorSelect.removeChild(competitorSelect.lastChild);
   }
 
   // Populate competitor dropdown
-  battlecard.competitors.forEach((competitor, index) => {
+  data.competitors.forEach((competitor, index) => {
     const option = document.createElement("option");
     option.value = competitor.company_name || `Competitor ${index + 1}`;
     option.textContent = competitor.company_name || `Competitor ${index + 1}`;
     competitorSelect.appendChild(option);
   });
 
-  // Show next steps container - make sure it's visible
-  nextStepsContainer.classList.remove("hidden");
-  console.log("Next steps container shown");
-
   // Set up generate button handler (only once to avoid duplicate handlers)
   if (!generateBtn.dataset.initialized) {
     generateBtn.addEventListener("click", async () => {
-      const targetUrl = document.getElementById("playbook-target-url")?.value?.trim() || "";
-      const targetContext = document.getElementById("playbook-target-context")?.value?.trim() || "";
-      const selectedCompetitorName = competitorSelect.value;
+      // Detect B2B vs B2C mode
+      const segmentType = document.querySelector("input[name='segment-type']:checked")?.value || "b2b";
+      let targetCompanyData = {};
 
-      if (!selectedCompetitorName || selectedCompetitorName === "" || selectedCompetitorName === "all") {
+      if (segmentType === "b2b") {
+        const targetUrl = document.getElementById("playbook-target-url")?.value?.trim() || "";
+        const targetContext = document.getElementById("playbook-target-context")?.value?.trim() || "";
+
+        if (!targetUrl && !targetContext) {
+          alert("Please enter a target company URL or context");
+          return;
+        }
+        targetCompanyData = { url: targetUrl, context: targetContext, type: "b2b" };
+      } else {
+        const personaName = document.getElementById("playbook-persona-name")?.value?.trim() || "";
+        const personaContext = document.getElementById("playbook-persona-context")?.value?.trim() || "";
+
+        if (!personaName && !personaContext) {
+          alert("Please enter a persona name or details");
+          return;
+        }
+        targetCompanyData = { persona_name: personaName, persona_context: personaContext, type: "b2c" };
+      }
+
+      const selectedCompetitorName = competitorSelect.value;
+      if (!selectedCompetitorName || selectedCompetitorName === "") {
         alert("Please select a competitor");
         return;
       }
 
-      if (!targetUrl && !targetContext) {
-        alert("Please enter a target company URL or context");
-        return;
-      }
-
       await generateSalesPlaybook(
-        { url: targetUrl, context: targetContext },
+        targetCompanyData,
         selectedCompetitorName,
-        battlecard
+        data  // Use the raw data object with competitors
       );
     });
     generateBtn.dataset.initialized = "true";
   }
 };
 
-const generateSalesPlaybook = async (targetCompany, selectedCompetitorName, battlecard) => {
+const generateSalesPlaybook = async (targetCompany, selectedCompetitorName, data) => {
   const resultsContainer = document.getElementById("playbook-results");
   if (!resultsContainer) return;
 
   try {
-    // Find the selected competitor in battlecard
-    const competitor = battlecard.competitors.find(c => c.company_name === selectedCompetitorName);
+    // Find the selected competitor in the data
+    const competitor = data.competitors.find(c => c.company_name === selectedCompetitorName);
     if (!competitor) {
-      alert("Competitor not found");
+      console.error(`Competitor "${selectedCompetitorName}" not found. Available: ${data.competitors.map(c => c.company_name).join(", ")}`);
+      alert(`Competitor "${selectedCompetitorName}" not found`);
       return;
+    }
+
+    // Show loading state
+    resultsContainer.innerHTML = '<div class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700"><strong>Generating playbook...</strong> Please wait.</div>';
+    resultsContainer.classList.remove("hidden");
+
+    // Build request payload
+    const payload = {
+      competitor: competitor,
+      your_company: {
+        name: data.target_company?.company_name || "Our Company",
+        how_we_win: data.target_company?.how_we_win || [],
+        pricing: data.target_company?.pricing || []
+      }
+    };
+
+    // Add target company data based on B2B/B2C type
+    if (targetCompany.type === "b2c") {
+      payload.target_company = {
+        persona_name: targetCompany.persona_name,
+        persona_context: targetCompany.persona_context,
+        context: targetCompany.persona_context
+      };
+    } else {
+      payload.target_company = {
+        url: targetCompany.url,
+        context: targetCompany.context
+      };
     }
 
     // Call backend to generate playbook
     const response = await fetch(`${BACKEND_BASE_URL}/next-steps`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        target_company: {
-          url: targetCompany.url,
-          context: targetCompany.context
-        },
-        competitor: competitor,
-        your_company: {
-          name: battlecard.target_company?.company_name || "Our Company",
-          how_we_win: battlecard.target_company?.how_we_win || [],
-          pricing: battlecard.target_company?.pricing || []
-        }
-      })
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
@@ -1145,12 +1228,12 @@ const generateSalesPlaybook = async (targetCompany, selectedCompetitorName, batt
       throw new Error(error.detail || `Failed to generate playbook (${response.status})`);
     }
 
-    const data = await response.json();
-    renderSalesPlaybook(data, resultsContainer);
+    const playbookData = await response.json();
+    renderSalesPlaybook(playbookData, resultsContainer);
   } catch (error) {
     console.error("Error generating sales playbook:", error);
     resultsContainer.innerHTML = `<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><strong>Error:</strong> ${error.message}</div>`;
-    toggleClass(resultsContainer, "hidden", false);
+    resultsContainer.classList.remove("hidden");
   }
 };
 
