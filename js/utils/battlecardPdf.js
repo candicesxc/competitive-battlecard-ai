@@ -123,23 +123,28 @@ function generateBattlecardPdf(battlecard) {
 
   // Helper to add a section header with background
   const addSectionHeader = (title) => {
-    checkPageBreak(20);
+    // Ensure enough space for header + content
+    if (yPosition + 20 > pageHeight - margin - 5) {
+      addPageFooter();
+      doc.addPage();
+      yPosition = margin;
+    }
 
-    // Add spacing before header
-    yPosition += 2;
+    // Add spacing above header
+    yPosition += 4;
 
-    // Background rectangle (11mm tall for proper spacing)
+    // Background rectangle
     doc.setFillColor(colors.indigo700[0], colors.indigo700[1], colors.indigo700[2]);
-    doc.rect(margin, yPosition, maxWidth, 8, 'F');
+    doc.rect(margin, yPosition, maxWidth, 7, 'F');
 
-    // Title text - center it vertically in the header
+    // Title text
     doc.setFontSize(sectionTitleSize);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(colors.white[0], colors.white[1], colors.white[2]);
-    doc.text(title, margin + 2, yPosition + 5.5);
+    doc.text(title, margin + 2, yPosition + 4.5);
 
-    // Move position past the header with proper spacing
-    yPosition += 11;
+    // Move past the header with spacing
+    yPosition += 9;
   };
 
   // ========== TITLE PAGE ==========
@@ -206,21 +211,21 @@ function generateBattlecardPdf(battlecard) {
           doc.setTextColor(colors.slate700[0], colors.slate700[1], colors.slate700[2]);
           const bulletLines = splitText(`• ${cleanLine}`, bodySize, maxWidth - 5);
           bulletLines.forEach((bulletLine, idx) => {
-            if (yPosition + lineHeight + 2 > pageHeight - margin - 5) {
+            if (yPosition + lineHeight + 3 > pageHeight - margin - 5) {
               addPageFooter();
               doc.addPage();
               yPosition = margin;
             }
             const xPos = idx === 0 ? margin : margin + 3;
             doc.text(bulletLine, xPos, yPosition);
-            yPosition += lineHeight + 0.8;
+            yPosition += lineHeight + 1;
           });
         }
       });
     } else {
       const paragraphLines = splitText(bodyText, bodySize, maxWidth);
       paragraphLines.forEach((line) => {
-        if (yPosition + lineHeight + 2 > pageHeight - margin - 5) {
+        if (yPosition + lineHeight + 3 > pageHeight - margin - 5) {
           addPageFooter();
           doc.addPage();
           yPosition = margin;
@@ -229,10 +234,10 @@ function generateBattlecardPdf(battlecard) {
         doc.setFont("helvetica", "normal");
         doc.setTextColor(colors.slate700[0], colors.slate700[1], colors.slate700[2]);
         doc.text(line, margin, yPosition);
-        yPosition += lineHeight + 1;
+        yPosition += lineHeight + 1.2;
       });
     }
-    yPosition += 3;
+    yPosition += 5;
   };
 
   // Process all sections
@@ -291,10 +296,7 @@ function generateBattlecardPdf(battlecard) {
       displayTitle = competitorPrefixMatch[1];
     }
 
-    // Check page break with enough space for header and some content
-    checkPageBreak(25);
-
-    // Add section header with background
+    // Add section header with background (handles page breaks internally)
     addSectionHeader(displayTitle);
 
     renderSectionBody(section.body);
