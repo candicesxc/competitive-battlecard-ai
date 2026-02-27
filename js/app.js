@@ -1797,28 +1797,15 @@ const firstClause = (text) => text.split(/[.,;]/)[0].trim().toLowerCase();
 // 1. Positioning angle — incorporate research pain points & priorities
 const buildPositioningAngle = (differentiators, theirWeaknesses, theirName, ourName, contextLabel, contextDetails, isB2C, painPoints = []) => {
   const d1 = differentiators[0] || "";
-  const d2 = differentiators[1] || "";
   const w1 = theirWeaknesses[0] || "";
 
-  const forWhom = isB2C && contextDetails
-    ? `For someone ${firstClause(contextDetails)}`
-    : `For ${contextLabel}`;
+  let angle = `${ourName} beats ${theirName} where it counts.`;
 
-  // If we have pain points, frame the angle around what matters to them
-  let angle = `${forWhom}, ${ourName} beats ${theirName} where it counts.`;
-
-  if (painPoints.length > 0) {
-    // Find differentiators that address the top pain point
-    const relevantDiff = differentiators.find(d =>
-      painPoints.some(p => d.toLowerCase().includes(p.toLowerCase().split(" ")[0]))
-    ) || d1;
-    angle += ` When ${painPoints[0]} is the priority, ${relevantDiff.replace(/\.$/, "").toLowerCase()}.`;
-  } else if (d1) {
-    angle += ` ${d1.replace(/\.$/, "")}.`;
+  if (painPoints.length > 0 && d1) {
+    angle += ` When ${painPoints[0]} is critical, ${d1.replace(/\.$/, "").toLowerCase()}.`;
   }
 
   if (w1) angle += ` ${theirName}'s gap: ${w1.charAt(0).toLowerCase() + w1.slice(1).replace(/\.$/, "")}.`;
-  if (d2 && d2 !== d1) angle += ` ${d2.replace(/\.$/, "")}.`;
   return angle;
 };
 
@@ -1850,20 +1837,16 @@ const buildOpeningHook = (theirName, contextLabel, contextDetails, isB2C, painPo
 
 // 3. Lead-withs — each differentiator reframed around the audience
 const buildLeadWiths = (differentiators, contextLabel, contextDetails, isB2C) => {
-  const prefix = isB2C && contextDetails
-    ? `For someone ${firstClause(contextDetails)}`
-    : `For ${contextLabel}`;
-  return differentiators.map(d => `${prefix}: ${d.replace(/\.$/, "")}`);
+  return differentiators.slice(0, 2).map(d => d.replace(/\.$/, ""));
 };
 
 // 4. Watch Out For — landmine + audience-specific counter
 const buildWatchOutFor = (landmines, differentiators, contextLabel, contextDetails, isB2C) => {
-  const audience = isB2C && contextDetails ? firstClause(contextDetails) : contextLabel;
-  return landmines.map((landmine, i) => {
+  return landmines.slice(0, 3).map((landmine, i) => {
     const base = differentiators[i % Math.max(differentiators.length, 1)] || "";
     const counter = base
-      ? `${base.replace(/\.$/, "")} — especially relevant for ${audience}.`
-      : `Keep the conversation focused on what matters most for ${audience}.`;
+      ? base.replace(/\.$/, "")
+      : "Keep the conversation focused on what matters most.";
     return { landmine, counter };
   });
 };
@@ -1915,19 +1898,10 @@ const buildPricingNarrative = (theirPricing, ourPricing, theirName, ourName, con
   const ourLine   = ourPricing[0]   || null;
   if (!theirLine && !ourLine) return null;
 
-  const roiAngle = isB2C && contextDetails
-    ? `For someone ${firstClause(contextDetails)}: the ROI question isn't which is cheaper — it's which one actually gets you to your goal.`
-    : `For ${contextLabel}: total cost of ownership matters more than list price. Factor in time-to-value, not just the monthly fee.`;
-
-  let out = roiAngle + "\n\n";
+  let out = "";
   if (theirLine) out += `**${theirName}:** ${theirLine}`;
   if (theirLine && ourLine) out += `\n**${ourName}:** ${ourLine}`;
   else if (ourLine) out += `**${ourName}:** ${ourLine}`;
-  const extras = [
-    ...theirPricing.slice(1).map(p => `${theirName}: ${p}`),
-    ...ourPricing.slice(1).map(p =>   `${ourName}: ${p}`)
-  ];
-  if (extras.length) out += `\n${extras.join("  ·  ")}`;
   return out;
 };
 
@@ -2034,7 +2008,7 @@ const renderSalesPlaybook = (playbook, container) => {
         </tr>`
       ).join("") +
       `</tbody></table>`;
-    html += sectionHTML("⚠️", "Watch Out For (Potential Landmines)", watchBody);
+    html += sectionHTML("⚠️", "Watch Out For", watchBody);
   }
 
   // 4. Discovery Questions
@@ -2050,9 +2024,9 @@ const renderSalesPlaybook = (playbook, container) => {
   // 5. Objection Responses (from their weaknesses)
   if (theirWeaknesses.length) {
     const objBody = `<ul class="space-y-2.5">` +
-      theirWeaknesses.map(w => `<li class="flex items-start gap-2">
+      theirWeaknesses.slice(0, 3).map((w, idx) => `<li class="flex items-start gap-2">
         <span class="text-amber-500 mt-0.5 flex-shrink-0">▶</span>
-        <span><span class="font-medium text-slate-700">If they bring up a ${esc(competitorName)} strength —</span> ${esc(w)}</span>
+        <span>${idx === 0 ? `<span class="font-medium text-slate-700">If they mention ${esc(competitorName)} strength: </span>` : ""}${esc(w)}</span>
       </li>`).join("") +
       `</ul>`;
     html += sectionHTML("💬", "Objection Responses", objBody);
