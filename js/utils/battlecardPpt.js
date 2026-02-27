@@ -16,13 +16,13 @@
  */
 function generateBattlecardPpt(battlecard, data) {
   // Check if PptxGenJs is available
-  if (typeof window.PptxGenJs === 'undefined' && typeof PptxGenJs === 'undefined') {
+  const PptxGenJs = window.PptxGenJs;
+  if (typeof PptxGenJs === 'undefined') {
     console.error("PptxGenJs library not loaded");
     alert("PowerPoint generation library not available. Please refresh the page.");
     return;
   }
 
-  const PptxGenJs = window.PptxGenJs || PptxGenJs;
   const pres = new PptxGenJs();
 
   // Configuration
