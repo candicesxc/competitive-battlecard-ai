@@ -210,7 +210,7 @@ function generateBattlecardPpt(battlecard, data) {
           contentY += 0.1;
         }
 
-        if (contentY > 6.5) break;
+        if (contentY > 6.5) return; // Stop adding items if we're running out of space
       });
     } else {
       slide.addText(bodyItems || '', {
