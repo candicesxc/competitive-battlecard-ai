@@ -100,6 +100,7 @@ const selectors = {
   suggestionButton: document.getElementById("suggestion-button"),
   savedBattlecardsContainer: document.getElementById("saved-battlecards-container"),
   savedBattlecardsList: document.getElementById("saved-battlecards-list"),
+  downloadPptBtnSidebar: document.getElementById("download-ppt-btn-sidebar"),
   downloadPdfBtnSidebar: document.getElementById("download-pdf-btn-sidebar"),
   expandPlaybookBtnSidebar: document.getElementById("expand-playbook-btn-sidebar"),
 };
@@ -125,6 +126,7 @@ let progressTimer = null;
 let startTime = null;
 let elapsedTime = 0;
 let currentBattlecard = null; // Store current battlecard for PDF generation
+let currentBattlecardRawData = null; // Store raw data for PPT generation
 
 const getProgressMessage = (value, elapsedSeconds) => {
   const estimatedTotal = 45; // Estimated total time in seconds (45 seconds)
@@ -933,6 +935,7 @@ const renderBattlecards = (data, companyUrl = null) => {
   if (typeof normalizeBattlecardData !== 'undefined') {
     const normalized = normalizeBattlecardData(data, companyUrl || selectors.urlInput?.value || "");
     currentBattlecard = normalized;
+    currentBattlecardRawData = data; // Store raw data for PPT generation
 
     // Save to localStorage
     if (typeof saveBattlecard !== 'undefined') {
@@ -1493,14 +1496,37 @@ const loadSavedBattlecard = (battlecardId) => {
   
   // Set current battlecard
   currentBattlecard = battlecard;
-  
+
   // Load the raw data and render it
   if (battlecard.rawData) {
+    currentBattlecardRawData = battlecard.rawData; // Store raw data for PPT generation
     renderBattlecards(battlecard.rawData, battlecard.companyUrl);
     // Scroll to results
     selectors.results?.scrollIntoView({ behavior: "smooth", block: "start" });
   } else {
     showError("Battlecard data is incomplete.");
+  }
+};
+
+/**
+ * Handles PowerPoint download
+ */
+const handlePptDownload = () => {
+  if (!currentBattlecard || !currentBattlecardRawData) {
+    showError("No battlecard available to download.");
+    return;
+  }
+
+  if (typeof generateBattlecardPpt === 'undefined') {
+    showError("PowerPoint generation is not available. Please refresh the page.");
+    return;
+  }
+
+  try {
+    generateBattlecardPpt(currentBattlecard, currentBattlecardRawData);
+  } catch (error) {
+    console.error("Error generating PowerPoint:", error);
+    showError("Failed to generate PowerPoint. Please try again.");
   }
 };
 
@@ -1512,12 +1538,12 @@ const handlePdfDownload = () => {
     showError("No battlecard available to download.");
     return;
   }
-  
+
   if (typeof generateBattlecardPdf === 'undefined') {
     showError("PDF generation is not available. Please refresh the page.");
     return;
   }
-  
+
   try {
     generateBattlecardPdf(currentBattlecard);
   } catch (error) {
@@ -2136,6 +2162,11 @@ if (document.readyState === 'loading') {
   });
 } else {
   updateSavedBattlecardsUI();
+}
+
+// Set up PPT download button (sidebar only now)
+if (selectors.downloadPptBtnSidebar) {
+  selectors.downloadPptBtnSidebar.addEventListener("click", handlePptDownload);
 }
 
 // Set up PDF download button (sidebar only now)
