@@ -254,13 +254,11 @@ function generateBattlecardPdf(battlecard) {
       if (lastCompetitorIndex !== compIndex) {
         lastCompetitorIndex = compIndex;
 
-        // Page break before each competitor
-        if (!isFirstSection) {
-          addPageFooter();
-          doc.addPage();
-        }
-        isFirstSection = false;
+        // Page break before each competitor (always, to ensure clean separation)
+        addPageFooter();
+        doc.addPage();
         yPosition = margin;
+        isFirstSection = false;
 
         // Extract competitor name from title
         const competitorName = section.title.replace(/^Competitor:\s*/i, "").replace(/ - Company overview$/i, "");
