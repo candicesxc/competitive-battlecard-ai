@@ -123,28 +123,37 @@ function generateBattlecardPdf(battlecard) {
 
   // Helper to add a section header with background
   const addSectionHeader = (title) => {
-    // Ensure enough space for header + content
-    if (yPosition + 20 > pageHeight - margin - 5) {
+    // Split long titles so the rect can grow to fit
+    doc.setFontSize(sectionTitleSize);
+    const titleLines = doc.splitTextToSize(title, maxWidth - 8);
+    const headerHeight = Math.max(9, titleLines.length * 6 + 4);
+
+    // Ensure enough space for header + at least one line of content
+    if (yPosition + headerHeight + 20 > pageHeight - margin - 5) {
       addPageFooter();
       doc.addPage();
       yPosition = margin;
     }
 
-    // Add spacing above header
-    yPosition += 4;
+    // Breathing room above header
+    yPosition += 6;
 
-    // Background rectangle
+    // Background rectangle — height grows with multi-line titles
     doc.setFillColor(colors.indigo700[0], colors.indigo700[1], colors.indigo700[2]);
-    doc.rect(margin, yPosition, maxWidth, 7, 'F');
+    doc.rect(margin, yPosition, maxWidth, headerHeight, 'F');
 
-    // Title text
-    doc.setFontSize(sectionTitleSize);
+    // Title text — rendered inside the rect with proper vertical padding
     doc.setFont("helvetica", "bold");
     doc.setTextColor(colors.white[0], colors.white[1], colors.white[2]);
-    doc.text(title, margin + 2, yPosition + 4.5);
+    // Start first baseline 6mm from rect top (leaves ~3mm cap-height room above)
+    let textY = yPosition + 6;
+    titleLines.forEach((line) => {
+      doc.text(line, margin + 3, textY);
+      textY += 6;
+    });
 
-    // Move past the header with spacing
-    yPosition += 9;
+    // Advance past header with generous clearance so body text never overlaps the rect
+    yPosition += headerHeight + 5;
   };
 
   // ========== TITLE PAGE ==========
