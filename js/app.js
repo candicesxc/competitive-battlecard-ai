@@ -1577,6 +1577,8 @@ const handleSubmit = async (event) => {
 
     const data = await response.json();
     renderBattlecards(data, inputValue);
+    // Scroll to results
+    selectors.results?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     console.error(error);
     const msg =
