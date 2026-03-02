@@ -69,6 +69,11 @@ Rules:
 - Only mark a company as "direct" if the product and target audience are clearly similar.
 - Prefer companies that sell similar products, to similar customers, in the same industry and size band.
 - If in doubt, lower the similarity_score instead of inflating it.
+- HARD FILTER — assign competitor_type "irrelevant" if EITHER of these is true:
+    (a) industry_similarity < 40  (clearly different market vertical)
+    (b) product_similarity < 35   (different product category)
+  Off-industry candidates that share only a company name or generic keywords with the
+  target must be marked "irrelevant" regardless of other scores.
 
 Return a single JSON array of these objects, with no extra text or markdown."""
 

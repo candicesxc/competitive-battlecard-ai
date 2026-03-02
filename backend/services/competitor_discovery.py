@@ -61,20 +61,37 @@ async def _collect_search_snippets_for_company(
     industry = profile.get("industry", "")
     target_audience = profile.get("target_audience", "")
 
-    # Build search queries — 3 high-signal queries instead of 6.
-    # "{name} competitors" and "{name} alternatives" surface different landing pages
-    # and cover most of what the redundant "{name} similar platforms" found.
-    # One audience-specific industry query replaces three overlapping industry queries.
-    queries: List[str] = []
-    if name:
-        queries.append(f"{name} competitors")
-        queries.append(f"{name} alternatives")
+    # Build search queries that anchor on the company's market *category*, not just
+    # its name.  Using only "{name} competitors" can badly misfire for common
+    # product-space names (e.g. a company called "Stream" in the earned-wage-access
+    # space would surface chat/streaming SDK competitors instead).  We therefore
+    # prioritise sub_industry- and keyword-anchored queries so the results are
+    # grounded in the right market segment, and only fall back to name-only queries
+    # when no richer signal is available.
+    sub_industry = profile.get("sub_industry", "")
+    keywords = profile.get("keywords", []) or []
 
-    if industry:
+    queries: List[str] = []
+
+    # --- Category-first queries (most reliable) ---
+    if sub_industry:
+        if target_audience:
+            queries.append(f"best {sub_industry} platforms for {target_audience}")
+        queries.append(f"top {sub_industry} competitors alternatives")
+    elif industry:
         if target_audience:
             queries.append(f"best {industry} tools for {target_audience}")
         else:
             queries.append(f"top {industry} tools")
+
+    # --- Name + category query (avoids pure name ambiguity) ---
+    if name:
+        if sub_industry:
+            queries.append(f"{name} {sub_industry} competitors alternatives")
+        elif industry:
+            queries.append(f"{name} {industry} competitors")
+        else:
+            queries.append(f"{name} competitors")
 
     # Execute searches sequentially to respect rate limiting
     # The rate limiter will ensure proper spacing between calls
@@ -137,7 +154,13 @@ async def _extract_competitor_stubs_from_snippets(
 
     target_name = profile.get("name", "")
     target_industry = profile.get("industry", "")
+    target_sub_industry = profile.get("sub_industry", "")
+    target_audience = profile.get("target_audience", "")
     target_summary = profile.get("summary", "")[:500]
+
+    # Build a rich category description to anchor the LLM's judgment
+    category_parts = [p for p in [target_sub_industry, target_industry] if p]
+    category_str = " / ".join(category_parts) if category_parts else "the same industry"
 
     system_prompt = (
         "You are an expert competitive intelligence analyst. "
@@ -150,16 +173,28 @@ async def _extract_competitor_stubs_from_snippets(
     user_content = f"""Target Company Profile:
 - Name: {target_name}
 - Industry: {target_industry}
+- Sub-industry: {target_sub_industry}
+- Target audience: {target_audience}
 - Summary: {target_summary}
 
 Web Search Excerpts:
 {json.dumps(snippets, indent=2)}
 
-Please analyze these excerpts and identify competitor companies. For each competitor found:
+Please analyze these excerpts and identify competitor companies.
+
+CRITICAL VALIDATION RULE: Only include a company if it genuinely operates in the same
+market as the target ({category_str}) and serves the same type of customer
+({target_audience or "same audience"}). Many web pages mention unrelated companies —
+DO NOT include them just because they appear near the target's name. For example, if the
+target is a fintech / earned-wage-access company, reject chat SDKs, communication
+platforms, CRMs, or any company from a different industry even if it shares a common
+product name with the target.
+
+For each qualifying competitor found:
 1. Extract the company name
 2. Extract the website URL if mentioned (leave empty if unknown)
-3. Write a brief description (1-2 sentences)
-4. Assess evidence_strength: "high" if explicitly mentioned as a competitor/alternative, 
+3. Write a brief description (1-2 sentences) that confirms it operates in {category_str}
+4. Assess evidence_strength: "high" if explicitly mentioned as a competitor/alternative,
    "medium" if mentioned in a comparison list, "low" if only loosely related
 
 Return a JSON array of competitor objects. Each object should have:
