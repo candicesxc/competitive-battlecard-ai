@@ -141,7 +141,10 @@ async def find_competitor_candidates_with_exa(
     except Exception as exc:
         logger.warning("Exa find_similar failed: %s", exc)
 
-    # Step 2: Build keyword queries from target profile
+    # Step 2: Build keyword queries from target profile.
+    # Anchor queries on sub_industry / industry first so that companies with
+    # common product-space names (e.g. "Stream") don't pull in unrelated
+    # industries.  Name-only queries are added only as a secondary signal.
     name = target_profile.get("name") or ""
     industry = target_profile.get("industry") or ""
     sub_industry = target_profile.get("sub_industry") or ""
@@ -150,16 +153,27 @@ async def find_competitor_candidates_with_exa(
 
     queries: List[str] = []
 
+    # --- Category-first queries (highest signal) ---
+    if sub_industry:
+        if target_audience:
+            queries.append(f"best {sub_industry} platforms for {target_audience}")
+        queries.append(f"top {sub_industry} alternatives competitors")
+    elif industry:
+        if target_audience:
+            queries.append(f"top {industry} tools for {target_audience}")
+        else:
+            queries.append(f"best {industry} platforms")
+
+    # --- Name + category query (avoids pure name ambiguity) ---
     if name:
-        queries.append(f"{name} alternatives")
-        queries.append(f"alternatives to {name} software")
+        if sub_industry:
+            queries.append(f"{name} {sub_industry} alternatives")
+        elif industry:
+            queries.append(f"{name} {industry} alternatives")
+        else:
+            queries.append(f"{name} alternatives")
 
-    if industry and target_audience:
-        queries.append(f"top {industry} tools for {target_audience}")
-
-    if industry:
-        queries.append(f"best {industry} platforms")
-
+    # --- Product-level query ---
     if core_products and len(core_products) > 0:
         queries.append(f"{core_products[0]} competitors")
 
