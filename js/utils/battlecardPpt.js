@@ -132,6 +132,32 @@
       .replace(/'/g, '&apos;');
   }
 
+  // ── Text layout helpers ──────────────────────────────────────────────────────
+  // Truncate a string to maxLen characters, appending "…" if cut.
+  function truncText(s, maxLen) {
+    s = String(s == null ? '' : s);
+    return s.length <= maxLen ? s : s.slice(0, maxLen - 1) + '\u2026';
+  }
+
+  /**
+   * Estimate the rendered height in EMU for a block of text.
+   * Uses a conservative character-width model (Arial proportional font).
+   * @param {string[]} lines  - array of text strings (each will be measured)
+   * @param {number} fontPt   - font size in points
+   * @param {number} widthIn  - text box width in inches
+   * @returns {number} height in EMU
+   */
+  function calcH(lines, fontPt, widthIn) {
+    // Conservative: assume avg char ≈ 0.58 × fontPt in points width
+    const charsPerLine = Math.max(1, Math.floor(widthIn * 72 / (fontPt * 0.58)));
+    let totalLines = 0;
+    for (const line of lines) {
+      totalLines += Math.max(1, Math.ceil(String(line).length / charsPerLine));
+    }
+    // 1.55× line spacing gives breathing room between wrapped lines
+    return emu(totalLines * fontPt * 1.55 / 72);
+  }
+
   // ── Color palette ────────────────────────────────────────────────────────────
   const C = {
     primaryDark:  '372FA3',
@@ -207,7 +233,7 @@
       </p:spPr>
       <p:txBody>
         <a:bodyPr wrap="square" lIns="0" rIns="0" tIns="0" bIns="0">
-          <a:spAutoFit/>
+          <a:normAutofit/>
         </a:bodyPr>
         <a:lstStyle/>
         ${paras}
@@ -275,35 +301,39 @@
   function buildContentSlide(title, sections) {
     _shapeId = 2;
     const shapes = [];
-    // White background
     shapes.push(makeRect(0, 0, SLIDE_W, SLIDE_H, C.white));
-    // Header bar
     shapes.push(makeRect(0, 0, SLIDE_W, emu(1), C.primaryDark));
-    // Title
     shapes.push(makeText(emu(0.5), emu(0.25), emu(9), emu(0.6), title, 32, true, C.white, 'l'));
 
     let y = emu(1.3);
     const maxY = emu(6.5);
+    const GAP = emu(0.07); // inter-shape gap
 
     for (const item of sections) {
       if (y >= maxY) break;
       if (typeof item === 'string') {
-        shapes.push(makeText(emu(0.7), y, emu(8.5), emu(0.4), item, 13, false, C.slate700, 'l'));
-        y += emu(0.5);
+        const txt = truncText(item, 200);
+        const h = calcH([txt], 13, 8.5);
+        shapes.push(makeText(emu(0.7), y, emu(8.5), h, txt, 13, false, C.slate700, 'l'));
+        y += h + GAP;
       } else if (item && item.title) {
-        shapes.push(makeText(emu(0.7), y, emu(8.5), emu(0.35), item.title, 14, true, C.primary, 'l'));
-        y += emu(0.42);
+        // Section heading
+        const headH = calcH([item.title], 14, 8.5);
+        shapes.push(makeText(emu(0.7), y, emu(8.5), headH, item.title, 14, true, C.primary, 'l'));
+        y += headH + GAP;
+        // Bullet lines
         const lines = Array.isArray(item.content) ? item.content : [item.content];
         for (const line of lines) {
           if (y >= maxY) break;
-          shapes.push(makeText(emu(1.0), y, emu(8.2), emu(0.3), `\u2022 ${line}`, 12, false, C.slate600, 'l'));
-          y += emu(0.32);
+          const bullet = `\u2022 ${truncText(String(line || ''), 160)}`;
+          const lineH = calcH([bullet], 12, 8.2);
+          shapes.push(makeText(emu(1.0), y, emu(8.2), lineH, bullet, 12, false, C.slate600, 'l'));
+          y += lineH + GAP;
         }
-        y += emu(0.1);
+        y += emu(0.1); // extra section gap
       }
     }
 
-    // Footer
     shapes.push(makeText(emu(0.5), emu(6.85), emu(9), emu(0.25), 'Competitive Battlecard AI', 10, false, C.slate500, 'r'));
     return wrapSlide(shapes);
   }
@@ -317,18 +347,22 @@
 
     let y = emu(1.1);
     const maxY = emu(6.5);
+    const GAP = emu(0.06);
 
     for (const section of sections) {
       if (y >= maxY) break;
-      shapes.push(makeText(emu(0.7), y, emu(8.5), emu(0.35), section.title, 13, true, C.primaryDark, 'l'));
-      y += emu(0.42);
+      const headH = calcH([section.title], 13, 8.5);
+      shapes.push(makeText(emu(0.7), y, emu(8.5), headH, section.title, 13, true, C.primaryDark, 'l'));
+      y += headH + GAP;
       const lines = Array.isArray(section.content) ? section.content : [section.content];
       for (const line of lines) {
         if (y >= maxY) break;
-        shapes.push(makeText(emu(1.0), y, emu(8.2), emu(0.28), `\u2022 ${line}`, 11, false, C.slate600, 'l'));
-        y += emu(0.3);
+        const bullet = `\u2022 ${truncText(String(line || ''), 150)}`;
+        const lineH = calcH([bullet], 11, 8.2);
+        shapes.push(makeText(emu(1.0), y, emu(8.2), lineH, bullet, 11, false, C.slate600, 'l'));
+        y += lineH + GAP;
       }
-      y += emu(0.15);
+      y += emu(0.12); // extra section gap
     }
 
     shapes.push(makeText(emu(0.5), emu(6.85), emu(9), emu(0.25), 'Competitive Battlecard AI', 10, false, C.slate500, 'r'));
@@ -378,6 +412,10 @@
   </p:sldIdLst>
   <p:sldSz cx="${SLIDE_W}" cy="${SLIDE_H}" type="screen4x3"/>
   <p:notesSz cx="${SLIDE_H}" cy="${SLIDE_W}"/>
+  <p:defaultTextStyle>
+    <a:defPPr><a:defRPr lang="en-US" smtClean="0"/></a:defPPr>
+    <a:lvl1pPr marL="0" algn="l"><a:defRPr lang="en-US" smtClean="0"/></a:lvl1pPr>
+  </p:defaultTextStyle>
 </p:presentation>`;
   }
 
@@ -385,10 +423,16 @@
     const slideRels = Array.from({ length: slideCount }, (_, i) =>
       `<Relationship Id="rId${i + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i + 1}.xml"/>`
     ).join('\n  ');
+    // rId1 = slideMaster, rId2..rId(n+1) = slides,
+    // rId(n+2) = presProps, rId(n+3) = viewProps, rId(n+4) = tableStyles
+    const n = slideCount;
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>
   ${slideRels}
+  <Relationship Id="rId${n + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" Target="presProps.xml"/>
+  <Relationship Id="rId${n + 3}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps" Target="viewProps.xml"/>
+  <Relationship Id="rId${n + 4}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles" Target="tableStyles.xml"/>
 </Relationships>`;
   }
 
