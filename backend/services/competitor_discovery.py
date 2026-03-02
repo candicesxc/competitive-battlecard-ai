@@ -69,7 +69,6 @@ async def _collect_search_snippets_for_company(
     # grounded in the right market segment, and only fall back to name-only queries
     # when no richer signal is available.
     sub_industry = profile.get("sub_industry", "")
-    keywords = profile.get("keywords", []) or []
 
     queries: List[str] = []
 

@@ -183,11 +183,19 @@ Return a JSON array of scored competitors matching the format described above.""
             if competitor_type not in ["direct", "adjacent", "aspirational", "irrelevant"]:
                 competitor_type = "adjacent"
 
+            industry_sim = _safe_float(entry.get("industry_similarity"), 0.0)
+            product_sim = _safe_float(entry.get("product_similarity"), 0.0)
+
+            # Enforce the hard filter in code — the LLM may return a non-"irrelevant"
+            # type even when scores are clearly too low.
+            if industry_sim < 40 or product_sim < 35:
+                competitor_type = "irrelevant"
+
             scored_comp: ScoredCompetitor = {
                 "name": entry.get("name", "").strip(),
                 "website": entry.get("website", "").strip(),
-                "industry_similarity": _safe_float(entry.get("industry_similarity"), 0.0),
-                "product_similarity": _safe_float(entry.get("product_similarity"), 0.0),
+                "industry_similarity": industry_sim,
+                "product_similarity": product_sim,
                 "audience_similarity": _safe_float(entry.get("audience_similarity"), 0.0),
                 "size_similarity": _safe_float(entry.get("size_similarity"), 0.0),
                 "business_model_similarity": _safe_float(entry.get("business_model_similarity"), 0.0),
