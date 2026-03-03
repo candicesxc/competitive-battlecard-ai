@@ -11,6 +11,36 @@ from .competitor_pipeline import fetch_page_text
 
 logger = logging.getLogger(__name__)
 
+# Company names / name fragments that are never real competitors — they are review
+# platforms, analyst firms, aggregator sites, or media outlets.  The check is
+# case-insensitive and matches on the normalised name (spaces/dots/dashes removed).
+_NON_COMPETITOR_NAME_FRAGMENTS = (
+    "g2",
+    "gartner",
+    "forrester",
+    "idc",
+    "capterra",
+    "getapp",
+    "softwareadvice",
+    "trustradius",
+    "peerspot",
+    "trustpilot",
+    "cbinsights",
+    "cbinsight",
+    "pitchbook",
+    "techcrunch",
+    "venturebeat",
+    "infoq",
+    "gartnergroup",
+)
+
+
+def _is_non_competitor_name(name: str) -> bool:
+    """Return True if the company name matches a known non-competitor (review/analyst) platform."""
+    normalized = name.lower().strip().replace(" ", "").replace(".", "").replace("-", "")
+    return any(frag in normalized for frag in _NON_COMPETITOR_NAME_FRAGMENTS)
+
+
 COMPETITOR_SCORING_PROMPT = """You are a senior competitive intelligence analyst.
 
 You will receive:
@@ -28,8 +58,13 @@ Your job is to compare each competitor to the target and evaluate:
    - Lower if only loosely related.
 
 2. product_similarity (0 to 100):
-   - 100 if they sell very similar core products or solve the same problem.
-   - Lower if products are different.
+   THIS IS THE MOST IMPORTANT DIMENSION.
+   - 100 if they sell essentially the same core product or solve the identical problem
+     for the same type of buyer (e.g., both are endpoint management platforms, both are
+     earned-wage-access apps, both are no-code form builders, etc.).
+   - 50 if they overlap significantly but are not the same product category.
+   - 0-30 if they are in a completely different product category — even if they share
+     an industry or target audience.
 
 3. audience_similarity (0 to 100):
    - 100 if they target the same customer segment.
@@ -43,13 +78,24 @@ Your job is to compare each competitor to the target and evaluate:
    - 100 if they use the same business model (for example both B2B SaaS).
    - Lower otherwise.
 
-Then compute an overall similarity_score (0 to 100) that reflects how directly this company competes with the target.
+Then compute an overall similarity_score (0 to 100) that reflects how directly this
+company competes with the target. Weight product_similarity the most heavily — two
+companies that sell the same core product to the same buyer are strong competitors even
+if they differ in size or business model details.
 
 Also assign competitor_type:
 - "direct" if product, industry, and audience are strongly similar.
 - "adjacent" if they operate nearby in the market or serve a similar audience with a different product.
 - "aspirational" if much larger but in essentially the same space.
 - "irrelevant" if they are not a meaningful competitor.
+
+AUTOMATIC "irrelevant" CASES — mark these as irrelevant immediately without scoring:
+- Software review / comparison platforms (G2, Capterra, TrustRadius, PeerSpot, GetApp, SoftwareAdvice, etc.)
+- Market research and analyst firms (Gartner, Forrester, IDC, CB Insights, PitchBook, etc.)
+- News outlets, blogs, or media companies (TechCrunch, VentureBeat, InfoQ, etc.)
+- Social networks, job boards, or directory sites (LinkedIn, Glassdoor, Indeed, Crunchbase, etc.)
+- Any company whose primary business is reviewing, ranking, or analysing other companies —
+  they do not sell a competing product to the same buyers.
 
 For each competitor, return a JSON object with:
 {
@@ -66,14 +112,17 @@ For each competitor, return a JSON object with:
 }
 
 Rules:
+- The core product sold must be similar. Sharing an industry or customer type is not
+  enough — if one company sells endpoint security software and the other sells market
+  research reports, they are irrelevant to each other.
 - Only mark a company as "direct" if the product and target audience are clearly similar.
 - Prefer companies that sell similar products, to similar customers, in the same industry and size band.
 - If in doubt, lower the similarity_score instead of inflating it.
 - HARD FILTER — assign competitor_type "irrelevant" if EITHER of these is true:
     (a) industry_similarity < 40  (clearly different market vertical)
-    (b) product_similarity < 35   (different product category)
-  Off-industry candidates that share only a company name or generic keywords with the
-  target must be marked "irrelevant" regardless of other scores.
+    (b) product_similarity < 50   (different core product category)
+  Off-industry or off-product candidates that share only a company name or generic
+  keywords with the target must be marked "irrelevant" regardless of other scores.
 
 Return a single JSON array of these objects, with no extra text or markdown."""
 
@@ -185,10 +234,17 @@ Return a JSON array of scored competitors matching the format described above.""
 
             industry_sim = _safe_float(entry.get("industry_similarity"), 0.0)
             product_sim = _safe_float(entry.get("product_similarity"), 0.0)
+            comp_name = entry.get("name", "").strip()
 
             # Enforce the hard filter in code — the LLM may return a non-"irrelevant"
             # type even when scores are clearly too low.
-            if industry_sim < 40 or product_sim < 35:
+            # product_similarity threshold raised to 50: the core product sold must match.
+            if industry_sim < 40 or product_sim < 50:
+                competitor_type = "irrelevant"
+
+            # Name-based blocklist: review platforms, analyst firms, media outlets, etc.
+            # are never real competitors regardless of what the LLM returns.
+            if _is_non_competitor_name(comp_name):
                 competitor_type = "irrelevant"
 
             scored_comp: ScoredCompetitor = {

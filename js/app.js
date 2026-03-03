@@ -907,6 +907,9 @@ const renderBattlecards = (data, companyUrl = null) => {
   const mainArea = document.querySelector("main");
   if (mainArea) {
     mainArea.addEventListener("scroll", () => {
+      // Only update competitor active state when the competitor cards view is visible
+      if (scrollContainer.classList.contains("hidden")) return;
+
       const cards = scrollContainer.querySelectorAll("[data-competitor-index]");
       let currentIndex = 0;
 
@@ -966,12 +969,9 @@ const buildCompetitiveMatrix = (targetCompany, competitors) => {
   ]).join(" ").toLowerCase();
 
   // Candidate dimension pools — pick those with signal in the profile data
+  // NOTE: Pricing-related dimensions are intentionally excluded — not disclosing
+  // pricing is a business decision, not a product weakness.
   const candidateDimensions = [
-    {
-      key: "pricing_transparency",
-      label: "Pricing Transparency",
-      keywords: ["pricing", "price", "cost", "affordable", "free tier", "enterprise pricing", "transparent"],
-    },
     {
       key: "ease_of_use",
       label: "Ease of Use",
@@ -1038,7 +1038,7 @@ const buildCompetitiveMatrix = (targetCompany, competitors) => {
   if (activeDimensions.length < 3) {
     activeDimensions.push(
       { key: "strengths_breadth", label: "Feature Breadth", keywords: [] },
-      { key: "pricing_transparency", label: "Pricing Transparency", keywords: ["pricing"] },
+      { key: "enterprise_readiness", label: "Enterprise Readiness", keywords: ["enterprise"] },
       { key: "ease_of_use", label: "Ease of Use", keywords: ["easy"] },
     );
   }
@@ -2193,6 +2193,11 @@ function showMainPanel(panelId) {
     const isActive = l.dataset.panel === panelId;
     l.classList.toggle("active", isActive);
   });
+
+  // Deactivate all competitor sidebar items — only one tab should be lit at a time
+  document.querySelectorAll(".competitor-sidebar-item").forEach(el => {
+    el.classList.remove("active");
+  });
 }
 
 function showCompetitorCards() {
@@ -2205,6 +2210,22 @@ function showCompetitorCards() {
   navLinks.forEach(l => {
     l.classList.remove("active");
   });
+
+  // Re-activate the correct competitor sidebar item based on current scroll position
+  const competitorsList = document.getElementById("competitors-list");
+  if (competitorsList && competitorScrollContainer) {
+    const cards = competitorScrollContainer.querySelectorAll("[data-competitor-index]");
+    let currentIndex = 0;
+    cards.forEach((card, idx) => {
+      const rect = card.getBoundingClientRect();
+      if (rect.top < window.innerHeight / 2) {
+        currentIndex = idx;
+      }
+    });
+    competitorsList.querySelectorAll(".competitor-sidebar-item").forEach((item, idx) => {
+      item.classList.toggle("active", idx === currentIndex);
+    });
+  }
 }
 
 navLinks.forEach(link => {
