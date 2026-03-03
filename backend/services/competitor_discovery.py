@@ -18,6 +18,9 @@ _SKIP_DOMAIN_KEYWORDS = (
     "capterra",
     "getapp",
     "softwareadvice",
+    "trustradius",
+    "peerspot",
+    "trustpilot",
     "glassdoor",
     "indeed",
     "builtin",
@@ -31,7 +34,41 @@ _SKIP_DOMAIN_KEYWORDS = (
     "medium.com",
     "crunchbase",
     "wikipedia",
+    "gartner.com",
+    "forrester.com",
+    "cbinsights.com",
+    "pitchbook.com",
+    "techcrunch.com",
+    "venturebeat.com",
 )
+
+# Company names that are review/analyst/media platforms and should never appear as
+# competitors in the stubs list.
+_NON_COMPETITOR_NAME_FRAGMENTS = (
+    "g2",
+    "gartner",
+    "forrester",
+    "idc",
+    "capterra",
+    "getapp",
+    "softwareadvice",
+    "trustradius",
+    "peerspot",
+    "trustpilot",
+    "cbinsights",
+    "cbinsight",
+    "pitchbook",
+    "techcrunch",
+    "venturebeat",
+    "infoq",
+    "gartnergroup",
+)
+
+
+def _is_non_competitor_name(name: str) -> bool:
+    """Return True if the company name matches a known non-competitor platform."""
+    normalized = name.lower().strip().replace(" ", "").replace(".", "").replace("-", "")
+    return any(frag in normalized for frag in _NON_COMPETITOR_NAME_FRAGMENTS)
 
 
 def _should_skip_domain(domain: str, target_domain: str | None) -> bool:
@@ -181,13 +218,18 @@ Web Search Excerpts:
 
 Please analyze these excerpts and identify competitor companies.
 
-CRITICAL VALIDATION RULE: Only include a company if it genuinely operates in the same
-market as the target ({category_str}) and serves the same type of customer
-({target_audience or "same audience"}). Many web pages mention unrelated companies —
-DO NOT include them just because they appear near the target's name. For example, if the
-target is a fintech / earned-wage-access company, reject chat SDKs, communication
-platforms, CRMs, or any company from a different industry even if it shares a common
-product name with the target.
+CRITICAL VALIDATION RULES:
+1. Only include a company if it genuinely operates in the same market as the target
+   ({category_str}) and sells a similar core product to the same type of customer
+   ({target_audience or "same audience"}).
+2. NEVER include software review or comparison platforms (G2, Capterra, TrustRadius,
+   PeerSpot, GetApp, SoftwareAdvice, etc.) — they don't sell a competing product.
+3. NEVER include market research / analyst firms (Gartner, Forrester, IDC, CB Insights,
+   PitchBook, etc.) — they publish reports, they are not product competitors.
+4. NEVER include news sites, media outlets, job boards, or directory sites as competitors.
+5. Many web pages mention unrelated companies — DO NOT include them just because they
+   appear near the target's name. Sharing an industry or a customer type is not enough;
+   the core product must be similar.
 
 For each qualifying competitor found:
 1. Extract the company name
@@ -375,6 +417,10 @@ async def discover_competitors_via_search(
 
         # Skip if target domain matches
         if domain and target_domain and domain.lower() == target_domain.lower():
+            continue
+
+        # Skip review platforms, analyst firms, and media outlets by name
+        if _is_non_competitor_name(name):
             continue
 
         # Filter out low evidence if desired (keep high and medium)
