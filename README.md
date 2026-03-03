@@ -28,6 +28,10 @@ The tool is fully deployed and ready to use. Simply paste a company URL to gener
 - 🖼️ **Visual Logos & Company Info** — Each card displays company information and website URLs.
 - 💾 **Save & Reload Battlecards** — Save generated battlecards to your browser and reload them anytime.
 - 📄 **PDF Export** — Download battlecards as formatted PDFs for sharing and documentation.
+- 📊 **PowerPoint Export** — Download battlecards as `.pptx` files (fully native OOXML — no library required, opens in Microsoft PowerPoint without any repair prompts):
+  - Title slide with company name, URL, and generation date
+  - Company overview slide with market snapshot, products, and strengths
+  - One dedicated slide per competitor with a 7-panel grid layout (Overview, Products, Strengths, Pricing, Weaknesses, Key Differentiators, Potential Landmines)
 - 🎯 **Sales Playbook Generator** — Generate comprehensive sales enablement resources for each competitor:
   - **Objection Handling** — Common objections with multiple response frameworks (FEEL-FELT-FOUND, FIA)
   - **Talk Tracks** — Sales stage-specific conversation flows (discovery, demo, close)
@@ -47,7 +51,8 @@ frontend/
 ├── app.js              # Frontend logic, handles API calls
 ├── battlecardTypes.js  # Type definitions and data utilities
 ├── utils/
-│   └── battlecardPdf.js # PDF generation utility
+│   ├── battlecardPdf.js # PDF generation utility (jsPDF)
+│   └── battlecardPpt.js # PowerPoint generation utility (pure OOXML/ZIP, no library)
 ├── css/
 │   └── styles.css      # Custom styles
 └── img/                # Fallback and sample logos
@@ -81,7 +86,7 @@ runtime.txt            # Python runtime version
 
 | Layer | Tools / Frameworks |
 |-------|--------------------|
-| **Frontend** | HTML, JavaScript, Tailwind CSS, jsPDF |
+| **Frontend** | HTML, JavaScript, Tailwind CSS, jsPDF (PDF), native OOXML/ZIP (PPTX) |
 | **Backend** | FastAPI, Uvicorn |
 | **AI & Agents** | CrewAI, OpenAI API |
 | **Search** | Exa (for competitor discovery and web search) |
@@ -137,7 +142,7 @@ runtime.txt            # Python runtime version
 2. Paste a company URL (e.g., `https://www.example.com`)
 3. Click "Generate Battlecard"
 4. Wait for the AI to analyze and generate battlecards
-5. View, save, or download the results as PDF
+5. View, save, or download the results as PDF or PowerPoint
 
 ---
 
@@ -154,6 +159,15 @@ runtime.txt            # Python runtime version
 - Includes all sections: overview, products, pricing, strengths, weaknesses
 - Clean formatting with proper headers and bullet points
 - Multi-page support for longer battlecards
+
+### PowerPoint Export
+- Generate `.pptx` files entirely in the browser — **zero server calls, zero external libraries**
+- Built with native OOXML/ZIP (ECMA-376 standard), so files open in Microsoft PowerPoint without any repair prompts
+- Slide structure:
+  1. **Title slide** — company name, website, and generation date on a branded dark background
+  2. **Company overview** — market snapshot, company description, products, and strengths
+  3. **One slide per competitor** — 7-panel grid layout with Overview, Products, Strengths, Pricing, Weaknesses, Key Differentiators, and Potential Landmines
+- Download via the "Download PPT" button after generating a battlecard
 
 ### Competitor Discovery
 - Uses Exa search API to find relevant competitors
