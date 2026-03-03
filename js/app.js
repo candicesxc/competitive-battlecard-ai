@@ -1785,12 +1785,18 @@ const initializeNextSteps = (battlecard) => {
   }
 };
 
-// ─── Playbook: build entirely from existing battlecard data, no API call ─────
+// ─── Playbook: 3-Layer Generation Framework ─────────────────────────────────
+// Layer 1: Extract from battlecard (read-only)
+// Layer 2: Inject persona context into every section
+// Layer 3: Build cross-reference map + conversation flow
 
 const extractDomain = (url = "") => {
   try { return new URL(url.startsWith("http") ? url : `https://${url}`).hostname.replace("www.", ""); }
   catch { return url; }
 };
+
+// Short first-clause of context for inline use
+const firstClause = (text) => text.split(/[.,;]/)[0].trim().toLowerCase();
 
 // ── Context relevance helpers ──────────────────────────────────────────────
 const getContextKeywords = (text) => {
@@ -1815,111 +1821,239 @@ const rankByContext = (items, keywords) => {
     .map(o => o.item);
 };
 
-// Short first-clause of context for inline use: "mid-career professional switching into tech"
-const firstClause = (text) => text.split(/[.,;]/)[0].trim().toLowerCase();
+// ── Layer 1: Battlecard Data Extraction ───────────────────────────────────
+// Explicitly reads each section from the battlecard. The battlecard is treated
+// as read-only — this function only extracts, never regenerates.
+const extractBattlecardData = (competitor, yourCompany) => {
+  return {
+    // Sourced from battlecard.how_we_win — competitor-specific differentiators
+    differentiators: competitor.how_we_win || [],
+    // Sourced from battlecard.potential_landmines — objections competitor will raise
+    landmines: competitor.potential_landmines || [],
+    // Sourced from battlecard.weaknesses — competitor's structural gaps
+    competitorWeaknesses: competitor.weaknesses || [],
+    // Sourced from battlecard.strengths — competitor's genuine strengths
+    competitorStrengths: competitor.strengths || [],
+    // Sourced from battlecard.pricing
+    theirPricing: competitor.pricing || [],
+    ourPricing: yourCompany.pricing || [],
+    ourStrengths: yourCompany.strengths || [],
+    // Data lineage map — tracks the source of each extracted field
+    sourceMap: {
+      differentiators: "battlecard › how_we_win",
+      landmines: "battlecard › potential_landmines",
+      competitorWeaknesses: "battlecard › competitor weaknesses",
+      competitorStrengths: "battlecard › competitor strengths",
+      pricing: "battlecard › pricing"
+    }
+  };
+};
 
-// ── Per-section builders — every one takes contextLabel + contextDetails ──
+// ── Layer 2: Persona Context Injection ────────────────────────────────────
+// Every builder takes contextLabel + painPoints and weaves them in explicitly.
+// Nothing is regenerated — only enhanced with buyer-specific framing.
 
-// 1. Positioning angle — incorporate research pain points & priorities
-const buildPositioningAngle = (differentiators, theirWeaknesses, theirName, ourName, contextLabel, contextDetails, isB2C, painPoints = []) => {
+// 1. Positioning angle — extracted from battlecard.how_we_win, persona-enhanced
+const buildPositioningAngle = (differentiators, competitorWeaknesses, theirName, ourName, contextLabel, isB2C, painPoints) => {
   const d1 = differentiators[0] || "";
-  const w1 = theirWeaknesses[0] || "";
+  const d2 = differentiators[1] || "";
+  const w1 = competitorWeaknesses[0] || "";
+  const topPain = painPoints && painPoints[0] ? painPoints[0] : null;
 
-  let angle = `${ourName} beats ${theirName} where it counts.`;
+  let angle = `${ourName} beats ${theirName} where it counts for ${contextLabel}.`;
 
-  if (painPoints.length > 0 && d1) {
-    angle += ` When ${painPoints[0]} is critical, ${d1.replace(/\.$/, "").toLowerCase()}.`;
+  if (topPain && d1) {
+    // Thread the persona's top pain point through the differentiator
+    angle += ` When ${topPain.toLowerCase()} is the priority, ${d1.replace(/\.$/, "").toLowerCase()} — a gap ${theirName} cannot close.`;
+  } else if (d1 && d2) {
+    angle += ` ${d1.replace(/\.$/, "")}. ${d2.replace(/\.$/, "")}.`;
+  } else if (d1) {
+    angle += ` ${d1.replace(/\.$/, "")}.`;
   }
 
-  if (w1) angle += ` ${theirName}'s gap: ${w1.charAt(0).toLowerCase() + w1.slice(1).replace(/\.$/, "")}.`;
+  if (w1 && !topPain) {
+    angle += ` ${theirName}'s limitation: ${w1.charAt(0).toLowerCase() + w1.slice(1).replace(/\.$/, "")}.`;
+  }
+
   return angle;
 };
 
-// 2. Opening hook — enhanced with pain points if available
-const buildOpeningHook = (theirName, contextLabel, contextDetails, isB2C, painPoints = []) => {
-  const topPain = painPoints.length > 0 ? painPoints[0] : null;
+// 2. Opening hook — references persona context and surfaces top pain point
+const buildOpeningHook = (theirName, contextLabel, contextDetails, isB2C, painPoints, landmines) => {
+  const topPain = painPoints && painPoints[0] ? painPoints[0] : null;
 
   if (isB2C && contextDetails) {
     const situation = firstClause(contextDetails);
     if (topPain) {
-      return `"You mentioned you're ${situation}, and ${topPain.toLowerCase()} is critical. Here's the hard truth about ${theirName}: they optimize for scale, not for that specific challenge. Let's talk about what actually solves it."`;
+      return `"You mentioned you're ${situation} — and ${topPain.toLowerCase()} is critical. Here's what you should know about ${theirName}: they're built for a different use case. Let's start with what actually solves your specific challenge."`;
     }
-    return `"You mentioned you're ${situation}. The question isn't whether ${theirName} has content — it's whether what you get from them actually achieves that goal. Let's start there."`;
+    return `"You mentioned you're ${situation}. The question isn't whether ${theirName} has a solution — it's whether their solution is built for what you actually need. Let's start there."`;
   }
 
   if (!isB2C && contextLabel && contextLabel !== "the prospect") {
     if (topPain) {
-      return `"For ${contextLabel}, ${topPain.toLowerCase()} is likely your biggest constraint. ${theirName} isn't built to solve that. Here's why we are."`;
+      return `"For ${contextLabel}, ${topPain.toLowerCase()} is likely your biggest operational constraint right now. ${theirName} isn't architected to solve that. Here's why we are — and why it matters specifically at your scale."`;
     }
-    return `"For a company like ${contextLabel}, the evaluation shouldn't stop at feature comparison against ${theirName}. What matters is which option moves the metric you care about. Let's dig into that."`;
+    return `"For a company like ${contextLabel}, the evaluation can't stop at feature comparison. What matters is which option moves the metric you actually care about. Let me show you where ${theirName} hits a ceiling."`;
   }
 
   if (topPain) {
-    return `"${topPain} is what's keeping you up at night. ${theirName} won't solve it. Here's why, and what actually will."`;
+    return `"${topPain} is the real constraint here. ${theirName} won't solve it the way you need it solved. Here's why, and what the actual difference looks like in practice."`;
   }
 
-  return `"${theirName} is a known name — but let's compare outcomes, not just features. What does success actually look like for you?"`;
+  return `"${theirName} is a credible name — but let's compare outcomes, not feature lists. What does success specifically look like for you?"`;
 };
 
-// 3. Lead-withs — each differentiator reframed around the audience
-const buildLeadWiths = (differentiators, contextLabel, contextDetails, isB2C) => {
+// 3. Lead-withs — pulled directly from battlecard.how_we_win (no regeneration)
+const buildLeadWiths = (differentiators) => {
   return differentiators.slice(0, 2).map(d => d.replace(/\.$/, ""));
 };
 
-// 4. Watch Out For — landmine + audience-specific counter
-const buildWatchOutFor = (landmines, differentiators, contextLabel, contextDetails, isB2C) => {
+// 4. Discovery questions — mapped from battlecard differentiators, not invented
+// Each question is designed to surface the gap the differentiator closes.
+const buildDiscoveryQuestion = (differentiator, competitorName, contextLabel, isB2C, painPoints) => {
+  const diff = (differentiator || "").toLowerCase();
+  const topPain = painPoints && painPoints[0] ? painPoints[0].toLowerCase() : null;
+  const scaleRef = isB2C
+    ? "your situation"
+    : (contextLabel && contextLabel !== "the prospect" ? contextLabel : "your environment");
+
+  // Autonomy / automation theme
+  if (diff.includes("autonom") || diff.includes("automat") || diff.includes("manual") || diff.includes("investigat")) {
+    return topPain
+      ? `When ${topPain} becomes critical, how many steps does your team take between detecting a problem and resolving it — and how much of that is manual?`
+      : `How many people are typically involved when ${competitorName} flags an issue — from detection all the way to resolution?`;
+  }
+
+  // Scale / enterprise / complexity theme
+  if (diff.includes("scale") || diff.includes("enterprise") || diff.includes("complex") || diff.includes("large") || diff.includes("global")) {
+    return `As ${scaleRef} grows, what's your plan for maintaining full visibility without proportionally growing the team that manages it?`;
+  }
+
+  // Real-time / speed / response theme
+  if (diff.includes("real-time") || diff.includes("instant") || diff.includes("fast") || diff.includes("speed") || diff.includes("response")) {
+    return `When an issue is detected, what's the actual gap between alert and resolution with your current setup — and how often does that gap cause downstream problems?`;
+  }
+
+  // Security / threat intelligence theme
+  if (diff.includes("threat") || diff.includes("security") || diff.includes("intelligence") || diff.includes("detect") || diff.includes("endpoint")) {
+    return topPain
+      ? `Given ${topPain}, what percentage of threats is your current solution catching proactively — before your team has to manually investigate?`
+      : `What percentage of endpoint incidents does your current solution detect and contextualize before your team gets involved?`;
+  }
+
+  // Platform / integration theme
+  if (diff.includes("integrat") || diff.includes("platform") || diff.includes("ecosystem") || diff.includes("unified")) {
+    return `How many separate tools does your team use alongside ${competitorName} to get complete visibility today — and what falls through the cracks between them?`;
+  }
+
+  // Cost / ROI theme
+  if (diff.includes("cost") || diff.includes("roi") || diff.includes("value") || diff.includes("saving") || diff.includes("tco")) {
+    return `When you look at total cost — including team hours spent on manual work — what does the current setup actually cost you each month?`;
+  }
+
+  // Compliance / governance theme
+  if (diff.includes("compli") || diff.includes("audit") || diff.includes("govern") || diff.includes("regulat")) {
+    return `If you got an audit request tomorrow for endpoint data, how long would it take to pull together — and how confident would you be in its completeness?`;
+  }
+
+  // Support / expertise theme
+  if (diff.includes("support") || diff.includes("expert") || diff.includes("implement") || diff.includes("partner")) {
+    return `When you hit a wall with ${competitorName}, what does getting to resolution actually look like — who's involved and how long does it take?`;
+  }
+
+  // Proactive / predictive theme
+  if (diff.includes("proactive") || diff.includes("predictive") || diff.includes("prevent") || diff.includes("before")) {
+    return `What percentage of your current approach is reactive — responding after something breaks — versus proactive prevention before it does?`;
+  }
+
+  // Generic fallback — frame the differentiator as a gap question
+  if (topPain) {
+    return `With ${topPain} as a priority, is ${competitorName}'s approach actually built to handle that — or is your team working around its limitations?`;
+  }
+  return `If ${competitorName} hit a ceiling in the next six months, would your team have the data to know it was coming — or would it be a surprise?`;
+};
+
+// 5. Watch Out For — battlecard landmines + persona-aware counters with differentiator pivot
+const buildWatchOutFor = (landmines, differentiators, contextLabel, isB2C, painPoints, companySize) => {
   return landmines.slice(0, 3).map((landmine, i) => {
-    const base = differentiators[i % Math.max(differentiators.length, 1)] || "";
-    const counter = base
-      ? base.replace(/\.$/, "")
-      : "Keep the conversation focused on what matters most.";
-    return { landmine, counter };
+    const diff = differentiators[i % Math.max(differentiators.length, 1)] || differentiators[0] || "";
+    const topPain = painPoints && painPoints[i]
+      ? painPoints[i]
+      : (painPoints && painPoints[0] ? painPoints[0] : null);
+    const scaleNote = companySize
+      ? `at ${contextLabel || "your"} scale`
+      : `for ${contextLabel || "your environment"}`;
+    const diffCore = diff.replace(/\.$/, "").toLowerCase();
+
+    let counter;
+    if (topPain && diffCore) {
+      counter = `When ${topPain.toLowerCase()} is the priority, ${diffCore}. That's the measurable difference ${scaleNote}.`;
+    } else if (diffCore && contextLabel && contextLabel !== "the prospect") {
+      counter = `${contextLabel}'s requirements go beyond what that argument addresses. ${diffCore}.`;
+    } else if (diffCore) {
+      counter = `Acknowledge it — then redirect: ${diffCore}.`;
+    } else {
+      counter = "Acknowledge and redirect to your core differentiator for this deal.";
+    }
+
+    return {
+      landmine,
+      counter,
+      differentiatorSource: diff,   // lineage: which differentiator backs this counter
+      source: "battlecard.potential_landmines"
+    };
   });
 };
 
-// 5. Discovery questions — persona/company prefix + pain point context
-const differentiatorToQuestion = (diff, theirName, contextLabel, contextDetails, isB2C, painPoints = []) => {
-  const l = diff.toLowerCase();
-  let q;
-  if (l.includes("accredit") || l.includes("recogni") || l.includes("verif"))
-    q = "Does the credential need to be verifiable by an employer — or is personal development enough?";
-  else if (l.includes("certif") || l.includes("certificate"))
-    q = "Are the certifications recognized by the specific employers or institutions you're targeting?";
-  else if (l.includes("degree") || l.includes("universit") || l.includes("academic"))
-    q = "Is a university-backed credential on the table, or are you looking for something shorter-term?";
-  else if (l.includes("employer") || l.includes("hire") || l.includes("hir") || l.includes("job pipeline"))
-    q = "Are you measuring success by the role change you land — or just by completing the course?";
-  else if (l.includes("ai") || l.includes("deepfake") || l.includes("phish") || l.includes("threat"))
-    q = "Is the training built for today's threats — or is it curriculum that hasn't changed in years?";
-  else if (l.includes("adaptive") || l.includes("personaliz") || l.includes("tailor"))
-    q = "Does the platform adapt to each learner, or does everyone get the same experience regardless?";
-  else if (l.includes("price") || l.includes("cost") || l.includes("roi") || l.includes("invest"))
-    q = "When comparing costs, are you looking at the outcome delivered — not just the price tag?";
-  else if (l.includes("support") || l.includes("integrat") || l.includes("onboard"))
-    q = "What does support look like after you sign — and how quickly do you see measurable results?";
-  else if (l.includes("partner") || l.includes("google") || l.includes("ibm") || l.includes("microsoft"))
-    q = "Are the companies behind this curriculum ones your buyers or employers would actually recognize?";
-  else {
-    const core = diff.replace(/^[^a-zA-Z]*/, "").split(" ").slice(0, 7).join(" ").toLowerCase();
-    q = `Does "${core}" actually move the needle on what you're trying to accomplish?`;
+// 6. Objection responses — if-they-say / you-say / pivot format
+// Source: battlecard.potential_landmines + battlecard.weaknesses → battlecard.how_we_win pivot
+const buildObjectionResponses = (landmines, competitorWeaknesses, differentiators, competitorName, contextLabel, isB2C, painPoints) => {
+  const responses = [];
+  const topPain = painPoints && painPoints[0] ? painPoints[0].toLowerCase() : null;
+
+  // Response 1: Address the top landmine directly — pivot to top differentiator
+  if (landmines[0] && differentiators[0]) {
+    const diff = differentiators[0].replace(/\.$/, "");
+    const pivot = topPain
+      ? `${diff}. At ${contextLabel || "your scale"}, ${topPain} makes that distinction critical — not theoretical.`
+      : `${diff}. That's what moves the needle for ${contextLabel || "deals like this"}.`;
+    responses.push({
+      if_they_say: landmines[0],
+      you_say: pivot,
+      pivot_to: differentiators[0],
+      source: "battlecard.potential_landmines → battlecard.how_we_win"
+    });
   }
 
-  // Add pain point context if available
-  if (painPoints.length > 0 && !q.includes("?")) {
-    // Ensure q ends with ?
-    q = q.replace(/\?$/, "") + "?";
+  // Response 2: Handle the "we're already happy with competitor" objection
+  if (competitorWeaknesses[0] && differentiators[1]) {
+    const diff = differentiators[1].replace(/\.$/, "");
+    const weaknessCore = competitorWeaknesses[0].toLowerCase().replace(/\.$/, "");
+    responses.push({
+      if_they_say: `We're already using ${competitorName} and it's working fine`,
+      you_say: `That's fair — and it works until ${weaknessCore} becomes a bottleneck. ${diff}. That's the gap that matters ${contextLabel && contextLabel !== "the prospect" ? `for ${contextLabel}` : "at your scale"}.`,
+      pivot_to: differentiators[1],
+      source: "battlecard.weaknesses → battlecard.how_we_win"
+    });
   }
 
-  // Prefix with persona or company
-  if (isB2C && contextDetails)
-    return `Given that you're ${firstClause(contextDetails)}: ${q}`;
-  if (!isB2C && contextLabel && contextLabel !== "the prospect")
-    return `For a company like ${contextLabel}: ${q}`;
-  return q;
+  // Response 3: Address the second landmine if available
+  if (landmines[1] && differentiators[2]) {
+    const diff = differentiators[2].replace(/\.$/, "");
+    responses.push({
+      if_they_say: landmines[1],
+      you_say: `That's where we need to separate perception from operational reality. ${diff}. The proof shows up when scale pressure hits.`,
+      pivot_to: differentiators[2],
+      source: "battlecard.potential_landmines → battlecard.how_we_win"
+    });
+  }
+
+  return responses.slice(0, 3);
 };
 
-// 6. Pricing — persona/company-specific ROI framing first
-const buildPricingNarrative = (theirPricing, ourPricing, theirName, ourName, contextLabel, contextDetails, isB2C) => {
+// 7. Pricing narrative — extracted from battlecard pricing, framed with persona context
+const buildPricingNarrative = (theirPricing, ourPricing, theirName, ourName, contextLabel, painPoints) => {
   const theirLine = theirPricing[0] || null;
   const ourLine   = ourPricing[0]   || null;
   if (!theirLine && !ourLine) return null;
@@ -1928,63 +2062,189 @@ const buildPricingNarrative = (theirPricing, ourPricing, theirName, ourName, con
   if (theirLine) out += `**${theirName}:** ${theirLine}`;
   if (theirLine && ourLine) out += `\n**${ourName}:** ${ourLine}`;
   else if (ourLine) out += `**${ourName}:** ${ourLine}`;
+
+  const topPain = painPoints && painPoints[0] ? painPoints[0].toLowerCase() : null;
+  if (topPain) {
+    out += `\n\n*The cost isn't just the license — it's what ${topPain} costs you when the tool hits its limits.*`;
+  }
+
   return out;
+};
+
+// ── Layer 3: Cross-Reference Map ──────────────────────────────────────────
+// Shows how each section connects and flows into the next.
+// Opening → Discovery → Differentiator (+ objection counter) → ROI close.
+const buildConversationFlowMap = (openingHook, discoveryQuestions, differentiators, landmines, objectionResponses, pricingFrame, competitorName) => {
+  const steps = [];
+
+  // Step 1: Opening Hook — sets up the first discovery path and preempts top landmine
+  steps.push({
+    type: "opening",
+    label: "Open",
+    content: openingHook,
+    preempts: landmines[0] || null,
+    lineage: "persona.context + battlecard.potential_landmines"
+  });
+
+  // Steps 2+: Discovery → Differentiator → Objection → ROI
+  const count = Math.min(discoveryQuestions.length, differentiators.length, 2);
+  for (let i = 0; i < count; i++) {
+    steps.push({
+      type: "discovery",
+      label: `Discover ${i + 1}`,
+      content: discoveryQuestions[i],
+      expected_trigger: `Prospect reveals a gap or friction point in ${competitorName}'s approach`,
+      lineage: "battlecard.how_we_win → question mapping"
+    });
+
+    const objResp = objectionResponses[i];
+    steps.push({
+      type: "differentiator",
+      label: `Win ${i + 1}`,
+      content: differentiators[i],
+      counters_landmine: landmines[i] || null,
+      if_challenged: objResp ? objResp.if_they_say : null,
+      response_to_challenge: objResp ? objResp.you_say : null,
+      lineage: "battlecard.how_we_win"
+    });
+  }
+
+  // Final step: ROI close
+  if (pricingFrame) {
+    steps.push({
+      type: "roi",
+      label: "Close",
+      content: pricingFrame,
+      closes: true,
+      lineage: "battlecard.pricing + persona.pain_points"
+    });
+  }
+
+  return steps;
+};
+
+// ── Consistency check: flag orphaned content ───────────────────────────────
+const checkPlaybookConsistency = (discoveryQuestions, objectionResponses, differentiators, landmines) => {
+  const flags = [];
+
+  if (discoveryQuestions.length > differentiators.length) {
+    flags.push(`${discoveryQuestions.length - differentiators.length} discovery question(s) have no differentiator to land on`);
+  }
+
+  const uncounteredLandmines = landmines.filter((_, i) => !differentiators[i]);
+  if (uncounteredLandmines.length > 0) {
+    flags.push(`${uncounteredLandmines.length} landmine(s) have no differentiator backing them`);
+  }
+
+  return flags; // empty = no issues
 };
 
 // ── Main builder ───────────────────────────────────────────────────────────
 const buildPlaybookFromBattlecard = (competitor, yourCompany, targetContext) => {
-  const isB2C          = targetContext.type === "b2c";
-  const contextLabel   = isB2C
+  const isB2C        = targetContext.type === "b2c";
+  const contextLabel = isB2C
     ? (targetContext.persona_name || "your prospect")
     : (targetContext.url ? extractDomain(targetContext.url) : "the prospect");
   const contextDetails = isB2C
     ? (targetContext.persona_context || "")
     : (targetContext.context || "");
 
-  // Extract research data (pain points, priorities, etc)
-  const painPoints     = targetContext.painPoints || [];
-  const priorities     = targetContext.priorities || [];
-  const industry       = targetContext.industry || null;
-  const companySize    = targetContext.companySize || null;
+  const painPoints  = targetContext.painPoints  || [];
+  const priorities  = targetContext.priorities  || [];
+  const industry    = targetContext.industry    || null;
+  const companySize = targetContext.companySize || null;
 
-  // Rank all battlecard lists by relevance to the persona/company context
-  const keywords        = getContextKeywords(`${contextLabel} ${contextDetails}`);
-  const ourName         = yourCompany.company_name || "Us";
-  const theirName       = competitor.company_name  || "Competitor";
-  const differentiators = rankByContext(competitor.how_we_win         || [], keywords);
-  const landmines       = rankByContext(competitor.potential_landmines || [], keywords);
-  const theirWeaknesses = rankByContext(competitor.weaknesses          || [], keywords);
-  const theirPricing    = competitor.pricing   || [];
-  const ourPricing      = yourCompany.pricing  || [];
+  // Layer 1: Extract battlecard data (read-only)
+  const bcData = extractBattlecardData(competitor, yourCompany);
 
-  // Pass pain points to all builders for richer context
-  const positioningAngle   = buildPositioningAngle(differentiators, theirWeaknesses, theirName, ourName, contextLabel, contextDetails, isB2C, painPoints);
-  const openingHook        = buildOpeningHook(theirName, contextLabel, contextDetails, isB2C, painPoints);
-  const leadWith           = buildLeadWiths(differentiators, contextLabel, contextDetails, isB2C);
-  const watchOutFor        = buildWatchOutFor(landmines, differentiators, contextLabel, contextDetails, isB2C);
-  const rawQuestions       = differentiators.slice(0, 4)
-    .map(d => differentiatorToQuestion(d, theirName, contextLabel, contextDetails, isB2C, painPoints));
+  // Rank all battlecard lists by relevance to this persona/company context
+  const keywords            = getContextKeywords(`${contextLabel} ${contextDetails} ${painPoints.join(" ")}`);
+  const differentiators     = rankByContext(bcData.differentiators,       keywords);
+  const landmines           = rankByContext(bcData.landmines,             keywords);
+  const competitorWeaknesses = rankByContext(bcData.competitorWeaknesses, keywords);
+  const competitorStrengths  = rankByContext(bcData.competitorStrengths,  keywords);
+
+  const ourName   = yourCompany.company_name || "Us";
+  const theirName = competitor.company_name  || "Competitor";
+
+  // Layer 2: Build persona-enhanced content sourced from battlecard
+  const positioningAngle = buildPositioningAngle(
+    differentiators, competitorWeaknesses, theirName, ourName, contextLabel, isB2C, painPoints
+  );
+  const openingHook = buildOpeningHook(
+    theirName, contextLabel, contextDetails, isB2C, painPoints, landmines
+  );
+  const leadWith = buildLeadWiths(differentiators);
+  const watchOutFor = buildWatchOutFor(
+    landmines, differentiators, contextLabel, isB2C, painPoints, companySize
+  );
+  const rawQuestions = differentiators.slice(0, 3).map(d =>
+    buildDiscoveryQuestion(d, theirName, contextLabel, isB2C, painPoints)
+  );
   const discoveryQuestions = [...new Set(rawQuestions)];
-  const pricingFrame       = buildPricingNarrative(theirPricing, ourPricing, theirName, ourName, contextLabel, contextDetails, isB2C);
+  const objectionResponses = buildObjectionResponses(
+    landmines, competitorWeaknesses, differentiators, theirName, contextLabel, isB2C, painPoints
+  );
+  const pricingFrame = buildPricingNarrative(
+    bcData.theirPricing, bcData.ourPricing, theirName, ourName, contextLabel, painPoints
+  );
 
-  return { competitorName: theirName, yourName: ourName, contextLabel, contextDetails, isB2C,
-           positioningAngle, openingHook, leadWith, watchOutFor, discoveryQuestions, pricingFrame, theirWeaknesses,
-           painPoints, priorities, industry, companySize };
+  // Layer 3: Build cross-reference map
+  const conversationFlowMap = buildConversationFlowMap(
+    openingHook, discoveryQuestions, differentiators, landmines,
+    objectionResponses, pricingFrame, theirName
+  );
+
+  // Consistency check
+  const consistencyFlags = checkPlaybookConsistency(
+    discoveryQuestions, objectionResponses, differentiators, landmines
+  );
+
+  // Data lineage — documents what was sourced from battlecard vs generated
+  const lineage = {
+    positioningAngle:   "battlecard.how_we_win + persona.pain_points",
+    openingHook:        "persona.context + battlecard.potential_landmines",
+    leadWith:           "battlecard.how_we_win",
+    watchOutFor:        "battlecard.potential_landmines + persona.scale context",
+    discoveryQuestions: "battlecard.how_we_win → question mapping",
+    objectionResponses: "battlecard.potential_landmines + battlecard.weaknesses → battlecard.how_we_win pivot",
+    pricingFrame:       "battlecard.pricing + persona.pain_points",
+    conversationFlowMap: "cross-reference: all sections"
+  };
+
+  return {
+    competitorName: theirName, yourName: ourName,
+    contextLabel, contextDetails, isB2C,
+    positioningAngle, openingHook, leadWith,
+    watchOutFor, discoveryQuestions, objectionResponses,
+    pricingFrame, conversationFlowMap, consistencyFlags, lineage,
+    painPoints, priorities, industry, companySize,
+    // Backwards-compatible field
+    theirWeaknesses: competitorWeaknesses
+  };
 };
 
-// Render the cheat-sheet playbook
+// ── Render the 3-layer playbook ────────────────────────────────────────────
 const renderSalesPlaybook = (playbook, container) => {
-  const { competitorName, yourName, contextLabel, positioningAngle, openingHook,
-          leadWith, watchOutFor, discoveryQuestions, pricingFrame, theirWeaknesses,
-          painPoints = [], priorities = [], industry = null } = playbook;
+  const {
+    competitorName, yourName, contextLabel,
+    positioningAngle, openingHook, leadWith,
+    watchOutFor, discoveryQuestions, objectionResponses,
+    pricingFrame, conversationFlowMap, consistencyFlags, lineage,
+    painPoints = [], industry = null
+  } = playbook;
 
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
-  const sectionHTML = (emoji, title, body) => `
+  // Section card with optional data-lineage badge
+  const sectionHTML = (emoji, title, body, lineageNote) => `
     <div class="mb-6 rounded-xl border border-slate-200/60 bg-white/95 shadow-sm overflow-hidden">
-      <div class="flex items-center gap-2 px-5 py-3.5 border-b border-slate-100 bg-slate-50/80">
-        <span class="text-base">${emoji}</span>
-        <span class="text-sm font-semibold text-slate-700">${title}</span>
+      <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/80">
+        <div class="flex items-center gap-2">
+          <span class="text-base">${emoji}</span>
+          <span class="text-sm font-semibold text-slate-700">${title}</span>
+        </div>
+        ${lineageNote ? `<span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-mono">${esc(lineageNote)}</span>` : ""}
       </div>
       <div class="px-5 py-4 text-sm text-slate-600 space-y-2">${body}</div>
     </div>`;
@@ -1993,38 +2253,54 @@ const renderSalesPlaybook = (playbook, container) => {
     <span class="font-medium text-slate-600">vs ${esc(competitorName)}</span>
     <span class="mx-1.5">·</span>
     <span>${esc(contextLabel)}</span>`;
-    if (industry) {
-      html += `<span class="mx-1.5">·</span><span>${esc(industry)}</span>`;
-    }
+  if (industry) html += `<span class="mx-1.5">·</span><span>${esc(industry)}</span>`;
   html += `</div>`;
 
-  // 0. Research Context (if available)
-  if (painPoints.length > 0) {
-    const painBody = `<ul class="space-y-1">` +
-      painPoints.slice(0, 3).map(p => `<li class="flex items-start gap-1.5"><span class="text-red-500 mt-0.5">•</span><span>${esc(p)}</span></li>`).join("") +
-      `</ul><p class="mt-2 text-xs text-slate-400 italic">Use this context to frame your messaging.</p>`;
-    html += sectionHTML("🎯", "What Matters Most", painBody);
+  // Consistency flags
+  if (consistencyFlags && consistencyFlags.length > 0) {
+    html += `<div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+      <p class="text-xs font-semibold text-amber-700 mb-1">Playbook consistency check:</p>
+      <ul class="text-xs text-amber-600 space-y-0.5">
+        ${consistencyFlags.map(f => `<li>• ${esc(f)}</li>`).join("")}
+      </ul>
+    </div>`;
   }
 
-  // 1. Positioning Angle
-  html += sectionHTML("🎯", "Positioning Angle", `<p class="leading-relaxed">${esc(positioningAngle)}</p>`);
+  // Section 0: What Matters Most — persona pain points to thread through every section
+  if (painPoints.length > 0) {
+    const painBody = `<ul class="space-y-1">` +
+      painPoints.slice(0, 3).map(p =>
+        `<li class="flex items-start gap-1.5"><span class="text-red-500 mt-0.5">•</span><span>${esc(p)}</span></li>`
+      ).join("") +
+      `</ul><p class="mt-2 text-xs text-slate-400 italic">Thread these pain points through every section of this conversation.</p>`;
+    html += sectionHTML("🎯", "What Matters Most", painBody, "persona research");
+  }
 
-  // 2. How to Open the Conversation
+  // Section 1: Positioning Angle — extracted from battlecard, persona-enhanced
+  html += sectionHTML(
+    "📐", "Positioning Angle",
+    `<p class="leading-relaxed">${esc(positioningAngle)}</p>`,
+    lineage && lineage.positioningAngle
+  );
+
+  // Section 2: How to Open the Conversation
   let openBody = `<p class="italic text-slate-700 border-l-2 border-indigo-300 pl-3 mb-3">${esc(openingHook)}</p>`;
   if (leadWith.length) {
     openBody += `<p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Lead with:</p>
       <ul class="space-y-1">` +
-      leadWith.map(d => `<li class="flex items-start gap-1.5"><span class="text-indigo-400 mt-0.5">•</span><span>${esc(d)}</span></li>`).join("") +
+      leadWith.map(d =>
+        `<li class="flex items-start gap-1.5"><span class="text-indigo-400 mt-0.5">•</span><span>${esc(d)}</span></li>`
+      ).join("") +
       `</ul>`;
   }
-  html += sectionHTML("🚀", "How to Open the Conversation", openBody);
+  html += sectionHTML("🚀", "How to Open the Conversation", openBody, lineage && lineage.openingHook);
 
-  // 3. Watch Out For
+  // Section 3: Watch Out For — landmines with persona-aware counters
   if (watchOutFor.length) {
-    let watchBody = `<table class="w-full text-xs border-collapse">
+    const watchBody = `<table class="w-full text-xs border-collapse">
       <thead><tr class="text-left border-b border-slate-200">
         <th class="pb-2 pr-3 font-semibold text-slate-500 w-2/5">Landmine to watch for</th>
-        <th class="pb-2 font-semibold text-slate-500">Your counter</th>
+        <th class="pb-2 font-semibold text-slate-500">Your counter (pivot back to your strength)</th>
       </tr></thead>
       <tbody class="divide-y divide-slate-100">` +
       watchOutFor.map(({ landmine, counter }) =>
@@ -2034,39 +2310,90 @@ const renderSalesPlaybook = (playbook, container) => {
         </tr>`
       ).join("") +
       `</tbody></table>`;
-    html += sectionHTML("⚠️", "Watch Out For", watchBody);
+    html += sectionHTML("⚠️", "Watch Out For", watchBody, lineage && lineage.watchOutFor);
   }
 
-  // 4. Discovery Questions
+  // Section 4: Discovery Questions — mapped from battlecard differentiators
   if (discoveryQuestions.length) {
     const qBody = `<ul class="space-y-2">` +
-      discoveryQuestions.map(q => `<li class="flex items-start gap-1.5">
-        <span class="text-emerald-500 font-bold mt-0.5">?</span>
-        <span>${esc(q)}</span></li>`).join("") +
-      `</ul>`;
-    html += sectionHTML("🔍", "Discovery Questions", qBody);
+      discoveryQuestions.map((q, i) =>
+        `<li class="flex items-start gap-1.5">
+          <span class="text-emerald-600 font-bold mt-0.5 flex-shrink-0 w-5">Q${i + 1}</span>
+          <span>${esc(q)}</span>
+        </li>`
+      ).join("") +
+      `</ul><p class="mt-3 text-xs text-slate-400 italic">Each question is designed to surface the gap that your key differentiator closes.</p>`;
+    html += sectionHTML("🔍", "Discovery Questions", qBody, lineage && lineage.discoveryQuestions);
   }
 
-  // 5. Objection Responses (from their weaknesses)
-  if (theirWeaknesses.length) {
-    const objBody = `<ul class="space-y-2.5">` +
-      theirWeaknesses.slice(0, 3).map((w, idx) => `<li class="flex items-start gap-2">
-        <span class="text-amber-500 mt-0.5 flex-shrink-0">▶</span>
-        <span>${idx === 0 ? `<span class="font-medium text-slate-700">If they mention ${esc(competitorName)} strength: </span>` : ""}${esc(w)}</span>
-      </li>`).join("") +
-      `</ul>`;
-    html += sectionHTML("💬", "Objection Responses", objBody);
+  // Section 5: Objection Responses — if-they-say / you-say / pivot format
+  if (objectionResponses && objectionResponses.length) {
+    const objBody = `<div class="space-y-4">` +
+      objectionResponses.map(r =>
+        `<div class="rounded-lg border border-slate-100 overflow-hidden">
+          <div class="px-3 py-2 bg-slate-50 border-b border-slate-100">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">If they say:</span>
+            <p class="mt-0.5 text-slate-700 text-xs italic">"${esc(r.if_they_say)}"</p>
+          </div>
+          <div class="px-3 py-2">
+            <span class="text-xs font-semibold text-emerald-600 uppercase tracking-wide">You say:</span>
+            <p class="mt-0.5 text-slate-600 text-xs">${esc(r.you_say)}</p>
+          </div>
+        </div>`
+      ).join("") +
+      `</div>`;
+    html += sectionHTML("💬", "Objection Responses", objBody, lineage && lineage.objectionResponses);
   }
 
-  // 6. Pricing / ROI
+  // Section 6: Pricing / ROI Framing
   if (pricingFrame) {
     const rows = pricingFrame.split("\n").map(line => {
-      const bold = line.replace(/\*\*(.+?)\*\*/g, '<span class="font-semibold text-slate-700">$1</span>');
-      return `<p class="leading-relaxed">${bold}</p>`;
+      const bold   = line.replace(/\*\*(.+?)\*\*/g, '<span class="font-semibold text-slate-700">$1</span>');
+      const italic = bold.replace(/\*(.+?)\*/g, '<span class="italic text-slate-500">$1</span>');
+      return `<p class="leading-relaxed">${italic}</p>`;
     }).join("");
     const pricingBody = rows +
-      `<p class="mt-3 text-xs text-slate-400 italic">Don't just echo the number — frame it as value delivered per dollar.</p>`;
-    html += sectionHTML("💰", "Pricing / ROI Framing", pricingBody);
+      `<p class="mt-3 text-xs text-slate-400 italic">Don't just echo the number — frame it as value delivered per dollar, specific to ${esc(contextLabel)}.</p>`;
+    html += sectionHTML("💰", "Pricing / ROI Framing", pricingBody, lineage && lineage.pricingFrame);
+  }
+
+  // Section 7: Conversation Flow Map — the connective tissue between all sections
+  if (conversationFlowMap && conversationFlowMap.length > 0) {
+    const stepColors = {
+      opening:       "bg-indigo-100 border-indigo-300 text-indigo-700",
+      discovery:     "bg-emerald-100 border-emerald-300 text-emerald-700",
+      differentiator:"bg-blue-100 border-blue-300 text-blue-700",
+      roi:           "bg-amber-100 border-amber-300 text-amber-700"
+    };
+    const stepIcons = { opening: "🚀", discovery: "🔍", differentiator: "💪", roi: "💰" };
+
+    let flowBody = `<p class="text-xs text-slate-500 mb-3 italic">Follow this path to guide the conversation from open to close — each step sets up the next.</p>
+      <div class="space-y-2">`;
+
+    conversationFlowMap.forEach((step, i) => {
+      const colorClass = stepColors[step.type] || "bg-slate-100 border-slate-300 text-slate-700";
+      const icon       = stepIcons[step.type] || "•";
+      const content    = step.content
+        ? step.content.substring(0, 100) + (step.content.length > 100 ? "…" : "")
+        : "";
+      const isLast = i === conversationFlowMap.length - 1;
+
+      flowBody += `<div class="flex items-start gap-2">
+        <div class="flex flex-col items-center">
+          <div class="w-7 h-7 rounded-full border flex items-center justify-center text-xs flex-shrink-0 ${colorClass}">${icon}</div>
+          ${!isLast ? `<div class="w-px h-4 bg-slate-200 mt-1"></div>` : ""}
+        </div>
+        <div class="flex-1 pb-1">
+          <p class="text-xs font-semibold text-slate-600">${esc(step.label)}</p>
+          <p class="text-xs text-slate-500 leading-relaxed">${esc(content)}</p>
+          ${step.counters_landmine ? `<p class="text-xs text-amber-600 mt-0.5">⚠ Preempts: "${esc(step.counters_landmine.substring(0, 60))}${step.counters_landmine.length > 60 ? "…" : ""}"</p>` : ""}
+          ${step.expected_trigger  ? `<p class="text-xs text-slate-400 mt-0.5 italic">Expected signal: ${esc(step.expected_trigger)}</p>` : ""}
+        </div>
+      </div>`;
+    });
+
+    flowBody += `</div>`;
+    html += sectionHTML("🗺️", "Conversation Flow Map", flowBody, "cross-reference: all sections");
   }
 
   container.innerHTML = html;
