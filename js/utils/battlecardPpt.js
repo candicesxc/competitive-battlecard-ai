@@ -1,227 +1,299 @@
 /**
- * PowerPoint generation utility for battlecards
- * Uses PptxGenJs to create professional enterprise-style presentations
+ * Self-contained PowerPoint generation utility for battlecards.
+ * Generates PPTX files using raw OOXML + ZIP — no external library required.
+ *
+ * PPTX is a ZIP archive of XML files (Office Open XML / ECMA-376).
+ * We build the ZIP with Store compression (method 0) and generate
+ * all required OOXML parts inline — zero CDN dependencies.
  *
  * Slide structure:
- * 1. Title slide - Battlecard for [Company], tool link, timestamp
- * 2. Company overview - About [Company]
- * 3. Competitive landscape - Market overview
- * 4+ Each competitor gets its own slide
+ * 1. Title slide
+ * 2. Company overview
+ * 3. Competitive landscape
+ * 4+. One slide per competitor
  */
 
-/**
- * Generates and downloads a PowerPoint presentation from battlecard data
- * @param {Object} battlecard - CompetitorBattlecard object with sections
- * @param {Object} data - Raw battlecard data with target_company and competitors
- */
-function generateBattlecardPpt(battlecard, data) {
-  // Check if PptxGenJs is available
-  const PptxGenJs = window.PptxGenJs;
-  if (typeof PptxGenJs === 'undefined') {
-    console.error("PptxGenJs library not loaded");
-    alert("PowerPoint generation library not available. Please refresh the page.");
-    return;
+(function () {
+  'use strict';
+
+  // ── CRC-32 ──────────────────────────────────────────────────────────────────
+  const _crcTable = (() => {
+    const t = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[i] = c;
+    }
+    return t;
+  })();
+
+  function crc32(buf) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < buf.length; i++) crc = _crcTable[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
   }
 
-  const pres = new PptxGenJs();
+  // ── Minimal ZIP builder (Store / no compression) ─────────────────────────────
+  function buildZip(files) {
+    // files: Array<{ name: string, data: Uint8Array }>
+    const enc = new TextEncoder();
+    const localParts = [];
+    const cdEntries = [];
+    let offset = 0;
 
-  // Configuration
-  pres.defineLayout({ name: 'TITLE', master: 'BLANK' });
+    for (const file of files) {
+      const nameBytes = enc.encode(file.name);
+      const data = file.data;
+      const crc = crc32(data);
+      const size = data.length;
 
-  // Color palette - Enterprise SaaS style
-  const colors = {
-    darkBg: '0F172A',        // Deep slate
-    darkBg2: '1E293B',       // Dark slate
-    primaryDark: '372FA3',   // Deep indigo
-    primary: '4F46E5',       // Indigo
-    primaryLight: '6366F1',  // Light indigo
-    accent: 'F97316',        // Orange
-    white: 'FFFFFF',
-    slate900: '0F172A',
-    slate800: '1E293B',
-    slate700: '334155',
-    slate600: '475569',
-    slate500: '64748B',
-    slate400: '94A3B8',
-    slate300: 'CBD5E1',
-    slate200: 'E2E8F0',
+      // Local file header (30 bytes) + filename + data
+      const lhBuf = new ArrayBuffer(30 + nameBytes.length);
+      const lh = new DataView(lhBuf);
+      lh.setUint32(0,  0x04034B50, true); // Local file header signature
+      lh.setUint16(4,  20,         true); // Version needed to extract
+      lh.setUint16(6,  0,          true); // General purpose bit flag
+      lh.setUint16(8,  0,          true); // Compression method: Store
+      lh.setUint16(10, 0,          true); // Last mod file time
+      lh.setUint16(12, 0,          true); // Last mod file date
+      lh.setUint32(14, crc,        true); // CRC-32
+      lh.setUint32(18, size,       true); // Compressed size
+      lh.setUint32(22, size,       true); // Uncompressed size
+      lh.setUint16(26, nameBytes.length, true); // File name length
+      lh.setUint16(28, 0,          true); // Extra field length
+      new Uint8Array(lhBuf, 30).set(nameBytes);
+
+      localParts.push(new Uint8Array(lhBuf));
+      localParts.push(data);
+
+      // Central directory entry (46 bytes) + filename
+      const cdBuf = new ArrayBuffer(46 + nameBytes.length);
+      const cd = new DataView(cdBuf);
+      cd.setUint32(0,  0x02014B50, true); // Central directory signature
+      cd.setUint16(4,  0x0314,     true); // Version made by (Unix, v20)
+      cd.setUint16(6,  20,         true); // Version needed
+      cd.setUint16(8,  0,          true); // Flags
+      cd.setUint16(10, 0,          true); // Compression method
+      cd.setUint16(12, 0,          true); // Mod time
+      cd.setUint16(14, 0,          true); // Mod date
+      cd.setUint32(16, crc,        true); // CRC-32
+      cd.setUint32(20, size,       true); // Compressed size
+      cd.setUint32(24, size,       true); // Uncompressed size
+      cd.setUint16(28, nameBytes.length, true); // File name length
+      cd.setUint16(30, 0,          true); // Extra field length
+      cd.setUint16(32, 0,          true); // File comment length
+      cd.setUint16(34, 0,          true); // Disk number start
+      cd.setUint16(36, 0,          true); // Internal attributes
+      cd.setUint32(38, 0,          true); // External attributes
+      cd.setUint32(42, offset,     true); // Relative offset of local header
+      new Uint8Array(cdBuf, 46).set(nameBytes);
+      cdEntries.push(new Uint8Array(cdBuf));
+
+      offset += 30 + nameBytes.length + size;
+    }
+
+    // Central directory offset and size
+    const cdOffset = offset;
+    const cdSize = cdEntries.reduce((s, e) => s + e.length, 0);
+
+    // End of central directory record (22 bytes)
+    const eocd = new ArrayBuffer(22);
+    const ev = new DataView(eocd);
+    ev.setUint32(0,  0x06054B50,    true); // Signature
+    ev.setUint16(4,  0,             true); // Disk number
+    ev.setUint16(6,  0,             true); // Start disk
+    ev.setUint16(8,  files.length,  true); // Entries on disk
+    ev.setUint16(10, files.length,  true); // Total entries
+    ev.setUint32(12, cdSize,        true); // Central directory size
+    ev.setUint32(16, cdOffset,      true); // Central directory offset
+    ev.setUint16(20, 0,             true); // Comment length
+
+    const parts = [...localParts, ...cdEntries, new Uint8Array(eocd)];
+    const total = parts.reduce((s, p) => s + p.length, 0);
+    const result = new Uint8Array(total);
+    let pos = 0;
+    for (const p of parts) { result.set(p, pos); pos += p.length; }
+    return result;
+  }
+
+  // ── EMU helpers ──────────────────────────────────────────────────────────────
+  const EMU_PER_INCH = 914400;
+  const SLIDE_W = 9144000;   // 10 inches
+  const SLIDE_H = 6858000;   // 7.5 inches
+  function emu(inches) { return Math.round(inches * EMU_PER_INCH); }
+
+  // ── XML escape ───────────────────────────────────────────────────────────────
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  // ── Text layout helpers ──────────────────────────────────────────────────────
+  // Truncate a string to maxLen characters, appending "…" if cut.
+  function truncText(s, maxLen) {
+    s = String(s == null ? '' : s);
+    return s.length <= maxLen ? s : s.slice(0, maxLen - 1) + '\u2026';
+  }
+
+  /**
+   * Estimate the rendered height in EMU for a block of text.
+   * Uses a conservative character-width model (Arial proportional font).
+   * @param {string[]} lines  - array of text strings (each will be measured)
+   * @param {number} fontPt   - font size in points
+   * @param {number} widthIn  - text box width in inches
+   * @returns {number} height in EMU
+   */
+  function calcH(lines, fontPt, widthIn) {
+    // Conservative: assume avg char ≈ 0.58 × fontPt in points width
+    const charsPerLine = Math.max(1, Math.floor(widthIn * 72 / (fontPt * 0.58)));
+    let totalLines = 0;
+    for (const line of lines) {
+      totalLines += Math.max(1, Math.ceil(String(line).length / charsPerLine));
+    }
+    // 1.55× line spacing gives breathing room between wrapped lines
+    return emu(totalLines * fontPt * 1.55 / 72);
+  }
+
+  // ── Color palette ────────────────────────────────────────────────────────────
+  const C = {
+    primaryDark:  '372FA3',
+    primary:      '4F46E5',
+    primaryLight: '6366F1',
+    accent:       'F97316',
+    white:        'FFFFFF',
+    darkBg2:      '1E293B',
+    slate900:     '0F172A',
+    slate700:     '334155',
+    slate600:     '475569',
+    slate500:     '64748B',
+    slate400:     '94A3B8',
+    slate300:     'CBD5E1',
   };
 
-  // Typography settings
-  const fonts = {
-    title: { name: 'Arial', size: 54, bold: true, color: colors.white },
-    subtitle: { name: 'Arial', size: 32, bold: true, color: colors.white },
-    heading: { name: 'Arial', size: 28, bold: true, color: colors.slate900 },
-    subheading: { name: 'Arial', size: 20, bold: true, color: colors.slate800 },
-    body: { name: 'Arial', size: 14, color: colors.slate700 },
-    bodyBold: { name: 'Arial', size: 14, bold: true, color: colors.slate700 },
-    small: { name: 'Arial', size: 11, color: colors.slate600 },
-  };
+  // ── Shape helpers ─────────────────────────────────────────────────────────────
+  let _shapeId = 2;
+  function nextId() { return _shapeId++; }
 
-  // Helper to add a title slide
-  const addTitleSlide = (title, companyName, companyUrl) => {
-    const slide = pres.addSlide();
+  function makeRect(x, y, w, h, fillColor) {
+    const id = nextId();
+    return `<p:sp>
+      <p:nvSpPr>
+        <p:cNvPr id="${id}" name="rect${id}"/>
+        <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+        <p:nvPr/>
+      </p:nvSpPr>
+      <p:spPr>
+        <a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${w}" cy="${h}"/></a:xfrm>
+        <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        <a:solidFill><a:srgbClr val="${fillColor}"/></a:solidFill>
+        <a:ln><a:noFill/></a:ln>
+      </p:spPr>
+      <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
+    </p:sp>`;
+  }
 
-    // Background gradient effect using rectangles
-    slide.addShape(pres.ShapeType.rect, {
-      x: 0, y: 0, w: '100%', h: '60%',
-      fill: { color: colors.primaryDark }
-    });
+  /**
+   * @param {number} x, y, w, h  - position/size in EMU
+   * @param {string} text         - content (newlines become paragraphs)
+   * @param {number} sz           - font size in POINTS
+   * @param {boolean} bold
+   * @param {string} color        - hex without #
+   * @param {string} align        - 'l' | 'ctr' | 'r'
+   * @param {boolean} italic
+   */
+  function makeText(x, y, w, h, text, sz, bold, color, align, italic) {
+    const id = nextId();
+    align = align || 'l';
+    const lines = String(text == null ? '' : text).split('\n');
+    const paras = lines.map(line => `<a:p>
+          <a:pPr algn="${align}"/>
+          <a:r>
+            <a:rPr lang="en-US" sz="${sz * 100}" b="${bold ? 1 : 0}" i="${italic ? 1 : 0}" dirty="0">
+              <a:solidFill><a:srgbClr val="${color}"/></a:solidFill>
+              <a:latin typeface="Arial"/>
+            </a:rPr>
+            <a:t>${esc(line)}</a:t>
+          </a:r>
+        </a:p>`).join('\n');
 
-    slide.addShape(pres.ShapeType.rect, {
-      x: 0, y: '60%', w: '100%', h: '40%',
-      fill: { color: colors.darkBg2 }
-    });
+    return `<p:sp>
+      <p:nvSpPr>
+        <p:cNvPr id="${id}" name="txt${id}"/>
+        <p:cNvSpPr txBox="1"><a:spLocks noGrp="1"/></p:cNvSpPr>
+        <p:nvPr/>
+      </p:nvSpPr>
+      <p:spPr>
+        <a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${w}" cy="${h}"/></a:xfrm>
+        <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        <a:noFill/>
+      </p:spPr>
+      <p:txBody>
+        <a:bodyPr wrap="square" lIns="0" rIns="0" tIns="0" bIns="0">
+          <a:normAutofit/>
+        </a:bodyPr>
+        <a:lstStyle/>
+        ${paras}
+      </p:txBody>
+    </p:sp>`;
+  }
 
+  // ── Slide XML wrapper ─────────────────────────────────────────────────────────
+  function wrapSlide(shapes, bgColor) {
+    const bg = bgColor
+      ? `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${bgColor}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>`
+      : '';
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    ${bg}
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="${SLIDE_W}" cy="${SLIDE_H}"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="${SLIDE_W}" cy="${SLIDE_H}"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      ${shapes.join('\n      ')}
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr><a:masterClr/></p:clrMapOvr>
+</p:sld>`;
+  }
+
+  // ── Individual slide builders ─────────────────────────────────────────────────
+  function buildTitleSlide(title, subtitle, companyUrl, dateStr) {
+    _shapeId = 2;
+    const shapes = [];
+    // Split background: dark indigo top 60%, dark slate bottom 40%
+    shapes.push(makeRect(0, 0, SLIDE_W, Math.round(SLIDE_H * 0.60), C.primaryDark));
+    shapes.push(makeRect(0, Math.round(SLIDE_H * 0.60), SLIDE_W, Math.round(SLIDE_H * 0.40), C.darkBg2));
     // Title
-    slide.addText(title, {
-      x: 0.5, y: 1.5, w: 9, h: 1.2,
-      fontSize: 48,
-      bold: true,
-      color: colors.white,
-      fontFace: 'Arial',
-      align: 'left'
-    });
-
-    // Subtitle
-    slide.addText(companyName, {
-      x: 0.5, y: 2.8, w: 9, h: 0.8,
-      fontSize: 32,
-      bold: true,
-      color: colors.primaryLight,
-      fontFace: 'Arial',
-      align: 'left'
-    });
-
+    shapes.push(makeText(emu(0.5), emu(1.5), emu(9), emu(1.2), title, 48, true, C.white, 'l'));
+    // Subtitle (company name)
+    shapes.push(makeText(emu(0.5), emu(2.8), emu(9), emu(0.8), subtitle, 32, true, C.primaryLight, 'l'));
     // Accent line
-    slide.addShape(pres.ShapeType.rect, {
-      x: 0.5, y: 3.7, w: 2, h: 0.08,
-      fill: { color: colors.primaryLight }
-    });
+    shapes.push(makeRect(emu(0.5), emu(3.7), emu(2), Math.round(0.06 * EMU_PER_INCH), C.primaryLight));
 
-    // Details box
-    let detailY = 4.2;
-
+    let detailY = emu(4.2);
     if (companyUrl) {
-      slide.addText(`Website: ${companyUrl}`, {
-        x: 0.5, y: detailY, w: 9, h: 0.35,
-        fontSize: 12,
-        color: colors.slate300,
-        fontFace: 'Arial'
-      });
-      detailY += 0.45;
+      shapes.push(makeText(emu(0.5), detailY, emu(9), emu(0.35), `Website: ${companyUrl}`, 12, false, C.slate300, 'l'));
+      detailY += emu(0.45);
     }
-
-    // Generated date
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    slide.addText(`Generated: ${dateStr}`, {
-      x: 0.5, y: detailY, w: 9, h: 0.35,
-      fontSize: 12,
-      color: colors.slate400,
-      fontFace: 'Arial'
-    });
-
-    // Tool link at bottom
-    slide.addText('Created with Competitive Battlecard AI', {
-      x: 0.5, y: 6.8, w: 9, h: 0.3,
-      fontSize: 11,
-      color: colors.accent,
-      fontFace: 'Arial',
-      italic: true
-    });
-  };
-
-  // Helper to add a content slide with title and body
-  const addContentSlide = (title, bodyItems) => {
-    const slide = pres.addSlide();
-
-    // White background
-    slide.background = { color: colors.white };
-
-    // Header bar
-    slide.addShape(pres.ShapeType.rect, {
-      x: 0, y: 0, w: '100%', h: 1,
-      fill: { color: colors.primaryDark }
-    });
-
-    // Title
-    slide.addText(title, {
-      x: 0.5, y: 0.25, w: 9, h: 0.6,
-      fontSize: 32,
-      bold: true,
-      color: colors.white,
-      fontFace: 'Arial',
-      align: 'left'
-    });
-
-    // Content
-    let contentY = 1.3;
-    const contentHeight = 4.7;
-
-    if (Array.isArray(bodyItems)) {
-      bodyItems.forEach((item, idx) => {
-        if (typeof item === 'string') {
-          // Simple text item
-          const lines = item.match(/[\s\S]{1,70}/g) || [item];
-          const itemHeight = Math.min(lines.length * 0.25, contentHeight - (contentY - 1.3));
-
-          slide.addText(item, {
-            x: 0.7, y: contentY, w: 8.5, h: itemHeight,
-            fontSize: 13,
-            color: colors.slate700,
-            fontFace: 'Arial',
-            align: 'left',
-            valign: 'top'
-          });
-          contentY += itemHeight + 0.15;
-        } else if (typeof item === 'object' && item.title) {
-          // Section with title and content
-          slide.addText(item.title, {
-            x: 0.7, y: contentY, w: 8.5, h: 0.35,
-            fontSize: 14,
-            bold: true,
-            color: colors.primary,
-            fontFace: 'Arial'
-          });
-          contentY += 0.4;
-
-          if (Array.isArray(item.content)) {
-            item.content.forEach((line) => {
-              const lineHeight = 0.28;
-              slide.addText(`• ${line}`, {
-                x: 1.0, y: contentY, w: 8.2, h: lineHeight,
-                fontSize: 12,
-                color: colors.slate600,
-                fontFace: 'Arial'
-              });
-              contentY += lineHeight + 0.05;
-            });
-          } else {
-            slide.addText(item.content, {
-              x: 1.0, y: contentY, w: 8.2, h: 0.4,
-              fontSize: 12,
-              color: colors.slate600,
-              fontFace: 'Arial'
-            });
-            contentY += 0.45;
-          }
-
-          contentY += 0.1;
-        }
-
-        if (contentY > 6.5) return; // Stop adding items if we're running out of space
-      });
-    } else {
-      slide.addText(bodyItems || '', {
-        x: 0.7, y: contentY, w: 8.5, h: 4,
-        fontSize: 13,
-        color: colors.slate700,
-        fontFace: 'Arial',
-        align: 'left',
-        valign: 'top'
-      });
-    }
+    shapes.push(makeText(emu(0.5), detailY, emu(9), emu(0.35), `Generated: ${dateStr}`, 12, false, C.slate400, 'l'));
+    shapes.push(makeText(emu(0.5), emu(6.8), emu(9), emu(0.3), 'Created with Competitive Battlecard AI', 11, false, C.accent, 'l', true));
 
     // Footer
     slide.addText('Competitive Battlecard AI', {
@@ -360,65 +432,252 @@ function generateBattlecardPpt(battlecard, data) {
     });
   };
 
-  // ========== BUILD PRESENTATION ==========
-
-  const companyName = battlecard.companyName || "Competitor Battlecard";
-  const companyUrl = battlecard.companyUrl || "";
-
-  // Slide 1: Title Slide
-  addTitleSlide("Competitive Battlecard", companyName, companyUrl);
-
-  // Slide 2: Company Overview
-  if (data.target_company) {
-    const targetCompany = data.target_company;
-    const aboutText = targetCompany.overview || "No overview available.";
-
-    const aboutItems = [];
-
-    if (targetCompany.overview) {
-      aboutItems.push({
-        title: "Overview",
-        content: [targetCompany.overview]
-      });
-    }
-
-    if (targetCompany.products && targetCompany.products.length > 0) {
-      aboutItems.push({
-        title: "Products & Services",
-        content: targetCompany.products.slice(0, 4)
-      });
-    }
-
-    if (targetCompany.strengths && targetCompany.strengths.length > 0) {
-      aboutItems.push({
-        title: "Key Strengths",
-        content: targetCompany.strengths.slice(0, 3)
-      });
-    }
-
-    addContentSlide(`About ${targetCompany.company_name || "Company"}`, aboutItems);
+  // ── OOXML package files ───────────────────────────────────────────────────────
+  function makeContentTypes(slideCount) {
+    const slides = Array.from({ length: slideCount }, (_, i) =>
+      `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`
+    ).join('\n  ');
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+  <Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
+  <Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
+  <Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
+  <Override PartName="/ppt/presProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presProps+xml"/>
+  <Override PartName="/ppt/viewProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml"/>
+  <Override PartName="/ppt/tableStyles.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml"/>
+  ${slides}
+</Types>`;
   }
 
-  // Slide 3: Competitive Landscape
-  if (data.market_summary || (data.competitors && data.competitors.length > 0)) {
-    const landscapeItems = [];
+  function makeRootRels() {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
+</Relationships>`;
+  }
 
-    if (data.market_summary) {
-      landscapeItems.push({
-        title: "Market Overview",
-        content: [data.market_summary]
-      });
-    }
+  function makePresentationXml(slideCount) {
+    const sldIds = Array.from({ length: slideCount }, (_, i) =>
+      `<p:sldId id="${256 + i}" r:id="rId${i + 2}"/>`
+    ).join('\n    ');
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+                xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:sldMasterIdLst>
+    <p:sldMasterId id="2147483648" r:id="rId1"/>
+  </p:sldMasterIdLst>
+  <p:sldIdLst>
+    ${sldIds}
+  </p:sldIdLst>
+  <p:sldSz cx="${SLIDE_W}" cy="${SLIDE_H}" type="screen4x3"/>
+  <p:notesSz cx="${SLIDE_H}" cy="${SLIDE_W}"/>
+  <p:defaultTextStyle>
+    <a:defPPr><a:defRPr lang="en-US" smtClean="0"/></a:defPPr>
+    <a:lvl1pPr marL="0" algn="l"><a:defRPr lang="en-US" smtClean="0"/></a:lvl1pPr>
+  </p:defaultTextStyle>
+</p:presentation>`;
+  }
 
-    if (data.competitors && data.competitors.length > 0) {
-      const competitorNames = data.competitors.map(c => c.company_name).slice(0, 6);
-      landscapeItems.push({
-        title: "Key Competitors",
-        content: competitorNames
-      });
-    }
+  function makePresentationRels(slideCount) {
+    const slideRels = Array.from({ length: slideCount }, (_, i) =>
+      `<Relationship Id="rId${i + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i + 1}.xml"/>`
+    ).join('\n  ');
+    // rId1 = slideMaster, rId2..rId(n+1) = slides,
+    // rId(n+2) = presProps, rId(n+3) = viewProps, rId(n+4) = tableStyles
+    const n = slideCount;
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>
+  ${slideRels}
+  <Relationship Id="rId${n + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" Target="presProps.xml"/>
+  <Relationship Id="rId${n + 3}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps" Target="viewProps.xml"/>
+  <Relationship Id="rId${n + 4}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles" Target="tableStyles.xml"/>
+</Relationships>`;
+  }
 
-    addContentSlide("Competitive Landscape", landscapeItems);
+  function makePresProps() {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentationPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:extLst/>
+</p:presentationPr>`;
+  }
+
+  function makeViewProps() {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:viewPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+          xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:normalViewPr>
+    <p:restoredLeft sz="15620" autoAdjust="0"/>
+    <p:restoredTop sz="94660" autoAdjust="0"/>
+  </p:normalViewPr>
+  <p:slideViewPr>
+    <p:cSldViewPr>
+      <p:cViewPr varScale="1">
+        <p:scale>
+          <a:sx n="64" d="100"/>
+          <a:sy n="64" d="100"/>
+        </p:scale>
+        <p:origin x="-1488" y="-108"/>
+      </p:cViewPr>
+    </p:cSldViewPr>
+  </p:slideViewPr>
+  <p:lastView>sldView</p:lastView>
+</p:viewPr>`;
+  }
+
+  function makeTableStyles() {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:tblStyleLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>`;
+  }
+
+  function makeTheme() {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Battlecard Theme">
+  <a:themeElements>
+    <a:clrScheme name="Battlecard">
+      <a:dk1><a:sysClr lastClr="000000" val="windowText"/></a:dk1>
+      <a:lt1><a:sysClr lastClr="FFFFFF" val="window"/></a:lt1>
+      <a:dk2><a:srgbClr val="1F3864"/></a:dk2>
+      <a:lt2><a:srgbClr val="E7E6E6"/></a:lt2>
+      <a:accent1><a:srgbClr val="4F46E5"/></a:accent1>
+      <a:accent2><a:srgbClr val="F97316"/></a:accent2>
+      <a:accent3><a:srgbClr val="6366F1"/></a:accent3>
+      <a:accent4><a:srgbClr val="372FA3"/></a:accent4>
+      <a:accent5><a:srgbClr val="64748B"/></a:accent5>
+      <a:accent6><a:srgbClr val="334155"/></a:accent6>
+      <a:hlink><a:srgbClr val="4F46E5"/></a:hlink>
+      <a:folHlink><a:srgbClr val="372FA3"/></a:folHlink>
+    </a:clrScheme>
+    <a:fontScheme name="Battlecard">
+      <a:majorFont><a:latin typeface="Arial"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>
+      <a:minorFont><a:latin typeface="Arial"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>
+    </a:fontScheme>
+    <a:fmtScheme name="Office">
+      <a:fillStyleLst>
+        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+        <a:gradFill rotWithShape="1"><a:gsLst>
+          <a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="50000"/><a:satMod val="300000"/></a:schemeClr></a:gs>
+          <a:gs pos="100000"><a:schemeClr val="phClr"><a:shade val="50000"/><a:satMod val="300000"/></a:schemeClr></a:gs>
+        </a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill>
+        <a:gradFill rotWithShape="1"><a:gsLst>
+          <a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="93000"/><a:satMod val="150000"/></a:schemeClr></a:gs>
+          <a:gs pos="100000"><a:schemeClr val="phClr"><a:shade val="63000"/><a:satMod val="120000"/></a:schemeClr></a:gs>
+        </a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill>
+      </a:fillStyleLst>
+      <a:lnStyleLst>
+        <a:ln w="6350" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln>
+        <a:ln w="12700" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln>
+        <a:ln w="19050" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln>
+      </a:lnStyleLst>
+      <a:effectStyleLst>
+        <a:effectStyle><a:effectLst/></a:effectStyle>
+        <a:effectStyle><a:effectLst/></a:effectStyle>
+        <a:effectStyle><a:effectLst>
+          <a:outerShdw blurRad="57150" dist="19050" dir="5400000" algn="ctr" rotWithShape="0">
+            <a:srgbClr val="000000"><a:alpha val="63000"/></a:srgbClr>
+          </a:outerShdw>
+        </a:effectLst></a:effectStyle>
+      </a:effectStyleLst>
+      <a:bgFillStyleLst>
+        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+        <a:solidFill><a:schemeClr val="phClr"><a:tint val="95000"/><a:satMod val="170000"/></a:schemeClr></a:solidFill>
+        <a:gradFill rotWithShape="1"><a:gsLst>
+          <a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="93000"/><a:satMod val="150000"/></a:schemeClr></a:gs>
+          <a:gs pos="100000"><a:schemeClr val="phClr"><a:shade val="63000"/><a:satMod val="120000"/></a:schemeClr></a:gs>
+        </a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill>
+      </a:bgFillStyleLst>
+    </a:fmtScheme>
+  </a:themeElements>
+</a:theme>`;
+  }
+
+  function makeSlideMaster() {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+             xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:bg>
+      <p:bgPr>
+        <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
+        <a:effectLst/>
+      </p:bgPr>
+    </p:bg>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/><a:ext cx="${SLIDE_W}" cy="${SLIDE_H}"/>
+          <a:chOff x="0" y="0"/><a:chExt cx="${SLIDE_W}" cy="${SLIDE_H}"/>
+        </a:xfrm>
+      </p:grpSpPr>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2"
+            accent1="accent1" accent2="accent2" accent3="accent3"
+            accent4="accent4" accent5="accent5" accent6="accent6"
+            hlink="hlink" folHlink="folHlink"/>
+  <p:txStyles>
+    <p:titleStyle><a:lvl1pPr algn="ctr"><a:defRPr lang="en-US" dirty="0"/></a:lvl1pPr></p:titleStyle>
+    <p:bodyStyle><a:lvl1pPr><a:defRPr lang="en-US" dirty="0"/></a:lvl1pPr></p:bodyStyle>
+    <p:otherStyle><a:defPPr><a:defRPr lang="en-US" dirty="0"/></a:defPPr></p:otherStyle>
+  </p:txStyles>
+</p:sldMaster>`;
+  }
+
+  function makeSlideMasterRels() {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>
+</Relationships>`;
+  }
+
+  function makeSlideLayout() {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+             xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+             type="blank" preserve="1">
+  <p:cSld name="Blank">
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/><a:ext cx="${SLIDE_W}" cy="${SLIDE_H}"/>
+          <a:chOff x="0" y="0"/><a:chExt cx="${SLIDE_W}" cy="${SLIDE_H}"/>
+        </a:xfrm>
+      </p:grpSpPr>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr><a:masterClr/></p:clrMapOvr>
+</p:sldLayout>`;
+  }
+
+  function makeSlideLayoutRels() {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>
+</Relationships>`;
+  }
+
+  function makeSlideRels() {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+</Relationships>`;
   }
 
   // Slides 4+: Each Competitor (one grid-layout slide per competitor)
@@ -436,16 +695,17 @@ function generateBattlecardPpt(battlecard, data) {
 
       addCompetitorSlide(competitor.company_name, sectionMap);
     });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${companyName.replace(/[^a-z0-9]/gi, '_')}_battlecard.pptx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
-  // Generate filename
-  const filename = `${companyName.replace(/[^a-z0-9]/gi, '_')}_battlecard.pptx`;
-
-  // Save the presentation
-  pres.save({ fileName: filename });
-}
-
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { generateBattlecardPpt };
-}
+  // Expose globally (browser) and as CommonJS module (Node.js / tests)
+  if (typeof window !== 'undefined') window.generateBattlecardPpt = generateBattlecardPpt;
+  if (typeof module !== 'undefined' && module.exports) module.exports = { generateBattlecardPpt };
+})();
