@@ -295,79 +295,142 @@
     shapes.push(makeText(emu(0.5), detailY, emu(9), emu(0.35), `Generated: ${dateStr}`, 12, false, C.slate400, 'l'));
     shapes.push(makeText(emu(0.5), emu(6.8), emu(9), emu(0.3), 'Created with Competitive Battlecard AI', 11, false, C.accent, 'l', true));
 
-    return wrapSlide(shapes);
-  }
+    // Footer
+    slide.addText('Competitive Battlecard AI', {
+      x: 0.5, y: 6.85, w: 9, h: 0.25,
+      fontSize: 10,
+      color: colors.slate500,
+      fontFace: 'Arial',
+      align: 'right'
+    });
+  };
 
-  function buildContentSlide(title, sections) {
-    _shapeId = 2;
-    const shapes = [];
-    shapes.push(makeRect(0, 0, SLIDE_W, SLIDE_H, C.white));
-    shapes.push(makeRect(0, 0, SLIDE_W, emu(1), C.primaryDark));
-    shapes.push(makeText(emu(0.5), emu(0.25), emu(9), emu(0.6), title, 32, true, C.white, 'l'));
+  // Helper to add a competitor slide using a 7-panel grid layout.
+  //
+  // Layout (10" × 7.5" slide):
+  //
+  //  ┌─────────────────────────────────────────────┐
+  //  │           Header (competitor name)           │
+  //  ├─────────────────────────────┬───────────────┤
+  //  │         Overview            │  Key Diff.    │
+  //  ├──────────────┬──────────────┤               │
+  //  │   Products   │  Strengths   ├───────────────┤
+  //  ├──────────────┼──────────────┤  Potential    │
+  //  │   Pricing    │  Weaknesses  │  Landmines    │
+  //  └──────────────┴──────────────┴───────────────┘
+  //
+  // sectionMap keys: overview, products, strengths, weaknesses,
+  //                  pricing, howWeWin, landmines  (all arrays of strings)
+  const addCompetitorSlide = (competitorName, sectionMap) => {
+    const slide = pres.addSlide();
+    slide.background = { color: 'F1F5F9' };
 
-    let y = emu(1.3);
-    const maxY = emu(6.5);
-    const GAP = emu(0.07); // inter-shape gap
+    // ── Header ────────────────────────────────────────────────────────────
+    slide.addShape(pres.ShapeType.rect, {
+      x: 0, y: 0, w: '100%', h: 0.55,
+      fill: { color: colors.slate900 }
+    });
+    slide.addText(competitorName, {
+      x: 0.3, y: 0.08, w: 9.4, h: 0.4,
+      fontSize: 22, bold: true, color: colors.white,
+      fontFace: 'Arial', align: 'center'
+    });
 
-    for (const item of sections) {
-      if (y >= maxY) break;
-      if (typeof item === 'string') {
-        const txt = truncText(item, 200);
-        const h = calcH([txt], 13, 8.5);
-        shapes.push(makeText(emu(0.7), y, emu(8.5), h, txt, 13, false, C.slate700, 'l'));
-        y += h + GAP;
-      } else if (item && item.title) {
-        // Section heading
-        const headH = calcH([item.title], 14, 8.5);
-        shapes.push(makeText(emu(0.7), y, emu(8.5), headH, item.title, 14, true, C.primary, 'l'));
-        y += headH + GAP;
-        // Bullet lines
-        const lines = Array.isArray(item.content) ? item.content : [item.content];
-        for (const line of lines) {
-          if (y >= maxY) break;
-          const bullet = `\u2022 ${truncText(String(line || ''), 160)}`;
-          const lineH = calcH([bullet], 12, 8.2);
-          shapes.push(makeText(emu(1.0), y, emu(8.2), lineH, bullet, 12, false, C.slate600, 'l'));
-          y += lineH + GAP;
-        }
-        y += emu(0.1); // extra section gap
-      }
-    }
+    // ── Layout constants ──────────────────────────────────────────────────
+    const TOP        = 0.65;
+    const BOTTOM     = 7.28;
+    const TOTAL_H    = BOTTOM - TOP;   // 6.63"
+    const GAP        = 0.1;
 
-    shapes.push(makeText(emu(0.5), emu(6.85), emu(9), emu(0.25), 'Competitive Battlecard AI', 10, false, C.slate500, 'r'));
-    return wrapSlide(shapes);
-  }
+    const LEFT_X     = 0.1;
+    const LEFT_W     = 6.55;
+    const RIGHT_X    = LEFT_X + LEFT_W + GAP;
+    const RIGHT_W    = 10 - RIGHT_X - 0.1;
 
-  function buildCompetitorSlide(name, sections) {
-    _shapeId = 2;
-    const shapes = [];
-    shapes.push(makeRect(0, 0, SLIDE_W, SLIDE_H, C.white));
-    shapes.push(makeRect(0, 0, SLIDE_W, emu(0.9), C.primary));
-    shapes.push(makeText(emu(0.5), emu(0.18), emu(9), emu(0.65), name, 30, true, C.white, 'l'));
+    // Left column: 3 rows
+    const ROW1_H     = 2.1;
+    const ROW2_H     = 1.85;
+    const ROW3_H     = TOTAL_H - ROW1_H - ROW2_H - GAP * 2;
 
-    let y = emu(1.1);
-    const maxY = emu(6.5);
-    const GAP = emu(0.06);
+    const ROW1_Y     = TOP;
+    const ROW2_Y     = ROW1_Y + ROW1_H + GAP;
+    const ROW3_Y     = ROW2_Y + ROW2_H + GAP;
 
-    for (const section of sections) {
-      if (y >= maxY) break;
-      const headH = calcH([section.title], 13, 8.5);
-      shapes.push(makeText(emu(0.7), y, emu(8.5), headH, section.title, 13, true, C.primaryDark, 'l'));
-      y += headH + GAP;
-      const lines = Array.isArray(section.content) ? section.content : [section.content];
-      for (const line of lines) {
-        if (y >= maxY) break;
-        const bullet = `\u2022 ${truncText(String(line || ''), 150)}`;
-        const lineH = calcH([bullet], 11, 8.2);
-        shapes.push(makeText(emu(1.0), y, emu(8.2), lineH, bullet, 11, false, C.slate600, 'l'));
-        y += lineH + GAP;
-      }
-      y += emu(0.12); // extra section gap
-    }
+    const HALF_W     = (LEFT_W - GAP) / 2;
+    const L_HALF_X   = LEFT_X;
+    const R_HALF_X   = LEFT_X + HALF_W + GAP;
 
-    shapes.push(makeText(emu(0.5), emu(6.85), emu(9), emu(0.25), 'Competitive Battlecard AI', 10, false, C.slate500, 'r'));
-    return wrapSlide(shapes);
-  }
+    // Right column: 2 equal panels
+    const RIGHT_P_H  = (TOTAL_H - GAP) / 2;
+    const RIGHT_R1_Y = TOP;
+    const RIGHT_R2_Y = TOP + RIGHT_P_H + GAP;
+
+    // ── Panel helper ──────────────────────────────────────────────────────
+    // Draws a white card with a coloured accent bar at the top.
+    // items: string[]  — rendered as a paragraph (1 item) or bullet list (2+)
+    const addPanel = (x, y, w, h, accentHex, title, items) => {
+      // Card background
+      slide.addShape(pres.ShapeType.rect, {
+        x, y, w, h,
+        fill: { color: colors.white },
+        line: { color: colors.slate300, width: 0.75 }
+      });
+      // Coloured top bar
+      slide.addShape(pres.ShapeType.rect, {
+        x, y, w, h: 0.3,
+        fill: { color: accentHex }
+      });
+      // Section title inside bar
+      slide.addText(title.toUpperCase(), {
+        x: x + 0.12, y: y + 0.05, w: w - 0.2, h: 0.22,
+        fontSize: 9, bold: true, color: colors.white, fontFace: 'Arial'
+      });
+
+      if (!items || items.length === 0) return;
+
+      const cx = x + 0.12;
+      const cy = y + 0.36;
+      const cw = w - 0.24;
+      const ch = h - 0.42;
+
+      // Single item → paragraph; multiple → bullet list
+      const text = items.length === 1
+        ? items[0]
+        : items.map(i => `• ${i}`).join('\n');
+
+      // Scale font down gently for longer lists so text fits
+      let fontSize = 10;
+      if (items.length > 5) fontSize = 9;
+      if (items.length > 8) fontSize = 8;
+      if (items.length === 1) fontSize = 10; // paragraph stays readable
+
+      slide.addText(text, {
+        x: cx, y: cy, w: cw, h: ch,
+        fontSize,
+        color: colors.slate700,
+        fontFace: 'Arial',
+        valign: 'top',
+        wrap: true,
+        shrinkText: true
+      });
+    };
+
+    // ── Draw the 7 panels ─────────────────────────────────────────────────
+    addPanel(LEFT_X,   ROW1_Y,     LEFT_W,  ROW1_H,  '3B82F6', 'Overview',            sectionMap.overview);
+    addPanel(L_HALF_X, ROW2_Y,     HALF_W,  ROW2_H,  'EF4444', 'Products',             sectionMap.products);
+    addPanel(R_HALF_X, ROW2_Y,     HALF_W,  ROW2_H,  'F59E0B', 'Strengths',            sectionMap.strengths);
+    addPanel(L_HALF_X, ROW3_Y,     HALF_W,  ROW3_H,  '14B8A6', 'Pricing',              sectionMap.pricing);
+    addPanel(R_HALF_X, ROW3_Y,     HALF_W,  ROW3_H,  '334155', 'Weaknesses',           sectionMap.weaknesses);
+    addPanel(RIGHT_X,  RIGHT_R1_Y, RIGHT_W, RIGHT_P_H, 'DC2626', 'Key Differentiators', sectionMap.howWeWin);
+    addPanel(RIGHT_X,  RIGHT_R2_Y, RIGHT_W, RIGHT_P_H, '0D9488', 'Potential Landmines', sectionMap.landmines);
+
+    // Footer
+    slide.addText('Competitive Battlecard AI', {
+      x: 0.3, y: 7.3, w: 9.4, h: 0.18,
+      fontSize: 8, color: colors.slate500,
+      fontFace: 'Arial', align: 'right'
+    });
+  };
 
   // ── OOXML package files ───────────────────────────────────────────────────────
   function makeContentTypes(slideCount) {
@@ -617,77 +680,20 @@
 </Relationships>`;
   }
 
-  // ── Main export ──────────────────────────────────────────────────────────────
-  function generateBattlecardPpt(battlecard, data) {
-    const enc = new TextEncoder();
-    const slides = [];
+  // Slides 4+: Each Competitor (one grid-layout slide per competitor)
+  if (data.competitors && data.competitors.length > 0) {
+    data.competitors.forEach((competitor) => {
+      const sectionMap = {
+        overview:  competitor.overview ? [competitor.overview] : [],
+        products:  (competitor.products          || []).slice(0, 6),
+        strengths: (competitor.strengths         || []).slice(0, 6),
+        weaknesses:(competitor.weaknesses        || []).slice(0, 6),
+        pricing:   (competitor.pricing           || []).slice(0, 5),
+        howWeWin:  (competitor.how_we_win        || []).slice(0, 6),
+        landmines: (competitor.potential_landmines || []).slice(0, 6),
+      };
 
-    const companyName = (battlecard && battlecard.companyName) || 'Competitor Battlecard';
-    const companyUrl  = (battlecard && battlecard.companyUrl)  || '';
-    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-    // Slide 1 — Title
-    slides.push(buildTitleSlide('Competitive Battlecard', companyName, companyUrl, dateStr));
-
-    // Slide 2 — Company Overview
-    if (data && data.target_company) {
-      const tc = data.target_company;
-      const sections = [];
-      if (tc.overview)                    sections.push({ title: 'Overview',           content: [tc.overview] });
-      if (tc.products  && tc.products.length)  sections.push({ title: 'Products & Services', content: tc.products.slice(0, 4) });
-      if (tc.strengths && tc.strengths.length) sections.push({ title: 'Key Strengths',        content: tc.strengths.slice(0, 3) });
-      slides.push(buildContentSlide(`About ${tc.company_name || 'Company'}`, sections));
-    }
-
-    // Slide 3 — Competitive Landscape
-    if (data && (data.market_summary || (data.competitors && data.competitors.length))) {
-      const sections = [];
-      if (data.market_summary) sections.push({ title: 'Market Overview', content: [data.market_summary] });
-      if (data.competitors && data.competitors.length) {
-        sections.push({ title: 'Key Competitors', content: data.competitors.map(c => c.company_name).slice(0, 8) });
-      }
-      slides.push(buildContentSlide('Competitive Landscape', sections));
-    }
-
-    // Slides 4+ — One per competitor
-    if (data && data.competitors && data.competitors.length) {
-      for (const comp of data.competitors) {
-        const sections = [];
-        if (comp.overview)                      sections.push({ title: 'Overview',   content: [comp.overview] });
-        if (comp.products  && comp.products.length)  sections.push({ title: 'Products',   content: comp.products.slice(0, 4) });
-        if (comp.strengths && comp.strengths.length) sections.push({ title: 'Strengths',  content: comp.strengths.slice(0, 5) });
-        if (comp.weaknesses && comp.weaknesses.length) sections.push({ title: 'Weaknesses', content: comp.weaknesses.slice(0, 5) });
-        if (comp.pricing   && comp.pricing.length)   sections.push({ title: 'Pricing',    content: comp.pricing.slice(0, 3) });
-        slides.push(buildCompetitorSlide(comp.company_name || 'Competitor', sections));
-      }
-    }
-
-    const slideCount = slides.length;
-
-    // Assemble OOXML package as ZIP
-    const files = [
-      { name: '[Content_Types].xml',                              data: enc.encode(makeContentTypes(slideCount)) },
-      { name: '_rels/.rels',                                      data: enc.encode(makeRootRels()) },
-      { name: 'ppt/presentation.xml',                             data: enc.encode(makePresentationXml(slideCount)) },
-      { name: 'ppt/_rels/presentation.xml.rels',                  data: enc.encode(makePresentationRels(slideCount)) },
-      { name: 'ppt/presProps.xml',                                data: enc.encode(makePresProps()) },
-      { name: 'ppt/viewProps.xml',                                data: enc.encode(makeViewProps()) },
-      { name: 'ppt/tableStyles.xml',                              data: enc.encode(makeTableStyles()) },
-      { name: 'ppt/theme/theme1.xml',                             data: enc.encode(makeTheme()) },
-      { name: 'ppt/slideMasters/slideMaster1.xml',                data: enc.encode(makeSlideMaster()) },
-      { name: 'ppt/slideMasters/_rels/slideMaster1.xml.rels',     data: enc.encode(makeSlideMasterRels()) },
-      { name: 'ppt/slideLayouts/slideLayout1.xml',                data: enc.encode(makeSlideLayout()) },
-      { name: 'ppt/slideLayouts/_rels/slideLayout1.xml.rels',     data: enc.encode(makeSlideLayoutRels()) },
-    ];
-
-    for (let i = 0; i < slideCount; i++) {
-      files.push({ name: `ppt/slides/slide${i + 1}.xml`,          data: enc.encode(slides[i]) });
-      files.push({ name: `ppt/slides/_rels/slide${i + 1}.xml.rels`, data: enc.encode(makeSlideRels()) });
-    }
-
-    const zipBytes = buildZip(files);
-    const blob = new Blob([zipBytes], {
-      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      addCompetitorSlide(competitor.company_name, sectionMap);
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
