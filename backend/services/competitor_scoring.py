@@ -15,23 +15,56 @@ logger = logging.getLogger(__name__)
 # platforms, analyst firms, aggregator sites, or media outlets.  The check is
 # case-insensitive and matches on the normalised name (spaces/dots/dashes removed).
 _NON_COMPETITOR_NAME_FRAGMENTS = (
+    # Review / comparison platforms
     "g2",
-    "gartner",
-    "forrester",
-    "idc",
     "capterra",
     "getapp",
     "softwareadvice",
     "trustradius",
     "peerspot",
     "trustpilot",
+    "comparably",
+    "sourceforge",
+    "alternativeto",
+    "producthunt",
+    "crozdesk",
+    "selecthub",
+    "financesonline",
+    "softwaresuggest",
+    "spiceworks",
+    "saasworthy",
+    "technologyadvice",
+    "featuredcustomers",
+    # Analyst / research firms
+    "gartner",
+    "forrester",
+    "idc",
     "cbinsights",
     "cbinsight",
     "pitchbook",
+    "gartnergroup",
+    "451research",
+    "everestgrp",
+    # Competitive intelligence / data
+    "zoominfo",
+    "similarweb",
+    "builtwith",
+    "stackshare",
+    "owler",
+    "datanyze",
+    # Tech news / media
     "techcrunch",
     "venturebeat",
     "infoq",
-    "gartnergroup",
+    "zdnet",
+    "techrepublic",
+    "pcmag",
+    "techradar",
+    "darkreading",
+    # Press release / wire services
+    "businesswire",
+    "prnewswire",
+    "globenewswire",
 )
 
 
