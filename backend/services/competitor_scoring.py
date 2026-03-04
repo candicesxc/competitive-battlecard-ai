@@ -7,65 +7,12 @@ from typing import List
 
 from ..models.company_profile import CompanyProfile, CompetitorStub, ScoredCompetitor
 from .analysis_service import AnalysisError, _json_completion
+from .blacklist import NON_COMPETITOR_NAME_FRAGMENTS as _NON_COMPETITOR_NAME_FRAGMENTS
 from .competitor_pipeline import fetch_page_text
 
 logger = logging.getLogger(__name__)
 
-# Company names / name fragments that are never real competitors — they are review
-# platforms, analyst firms, aggregator sites, or media outlets.  The check is
-# case-insensitive and matches on the normalised name (spaces/dots/dashes removed).
-_NON_COMPETITOR_NAME_FRAGMENTS = (
-    # Review / comparison platforms
-    "g2",
-    "capterra",
-    "getapp",
-    "softwareadvice",
-    "trustradius",
-    "peerspot",
-    "trustpilot",
-    "comparably",
-    "sourceforge",
-    "alternativeto",
-    "producthunt",
-    "crozdesk",
-    "selecthub",
-    "financesonline",
-    "softwaresuggest",
-    "spiceworks",
-    "saasworthy",
-    "technologyadvice",
-    "featuredcustomers",
-    # Analyst / research firms
-    "gartner",
-    "forrester",
-    "idc",
-    "cbinsights",
-    "cbinsight",
-    "pitchbook",
-    "gartnergroup",
-    "451research",
-    "everestgrp",
-    # Competitive intelligence / data
-    "zoominfo",
-    "similarweb",
-    "builtwith",
-    "stackshare",
-    "owler",
-    "datanyze",
-    # Tech news / media
-    "techcrunch",
-    "venturebeat",
-    "infoq",
-    "zdnet",
-    "techrepublic",
-    "pcmag",
-    "techradar",
-    "darkreading",
-    # Press release / wire services
-    "businesswire",
-    "prnewswire",
-    "globenewswire",
-)
+
 
 
 def _is_non_competitor_name(name: str) -> bool:
