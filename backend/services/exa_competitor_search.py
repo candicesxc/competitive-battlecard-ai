@@ -8,98 +8,11 @@ from urllib.parse import urlparse
 import httpx
 
 from ..models.company_profile import CompanyProfile
+from .blacklist import SKIP_DOMAIN_KEYWORDS as _SKIP_DOMAIN_KEYWORDS
 from .exa_client import cached_find_similar_and_contents, cached_search_and_contents
 from .search_service import extract_domain
 
 logger = logging.getLogger(__name__)
-
-_SKIP_DOMAIN_KEYWORDS = (
-    # ── Software review / comparison platforms ──────────────────────────────
-    "g2.com",
-    "capterra",
-    "getapp",
-    "softwareadvice",
-    "trustradius",
-    "peerspot",
-    "trustpilot",
-    "comparably.com",
-    "clutch.co",
-    "sourceforge.net",
-    "alternativeto.net",
-    "producthunt.com",
-    "slashdot.org",
-    "crozdesk.com",
-    "selecthub.com",
-    "financesonline.com",
-    "softwaresuggest.com",
-    "spiceworks.com",
-    "saasworthy.com",
-    "technologyadvice.com",
-    "featuredcustomers.com",
-    # ── Analyst / market-research firms ─────────────────────────────────────
-    "gartner.com",
-    "forrester.com",
-    "cbinsights.com",
-    "pitchbook.com",
-    "idc.com",
-    "451research.com",
-    "aberdeen.com",
-    "everestgrp.com",
-    # ── Competitive-intelligence / data-enrichment tools ────────────────────
-    "zoominfo.com",
-    "similarweb.com",
-    "builtwith.com",
-    "stackshare.io",
-    "owler.com",
-    "craft.co",
-    "datanyze.com",
-    "slintel.com",
-    # ── Job boards / HR platforms ────────────────────────────────────────────
-    "glassdoor",
-    "indeed",
-    "builtin",
-    "ziprecruiter.com",
-    "monster.com",
-    "wellfound.com",
-    # ── Social media / communities ───────────────────────────────────────────
-    "linkedin",
-    "facebook",
-    "twitter",
-    "x.com",
-    "youtube",
-    "pinterest",
-    "reddit",
-    "medium.com",
-    "instagram",
-    "tiktok.com",
-    "quora.com",
-    # ── Business directories ─────────────────────────────────────────────────
-    "crunchbase",
-    "wikipedia",
-    "dnb.com",
-    "manta.com",
-    "bbb.org",
-    "yelp.com",
-    # ── Tech news / media outlets ────────────────────────────────────────────
-    "techcrunch.com",
-    "venturebeat.com",
-    "zdnet.com",
-    "techrepublic.com",
-    "theverge.com",
-    "wired.com",
-    "businessinsider.com",
-    "theregister.com",
-    "computerworld.com",
-    "infoworld.com",
-    "pcmag.com",
-    "techradar.com",
-    "darkreading.com",
-    # ── Press-release / wire services ────────────────────────────────────────
-    "businesswire.com",
-    "prnewswire.com",
-    "globenewswire.com",
-    "accesswire.com",
-)
 
 _USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "

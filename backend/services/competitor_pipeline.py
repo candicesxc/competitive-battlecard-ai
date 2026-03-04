@@ -17,6 +17,7 @@ from .exa_competitor_search import (
     CompetitorCandidate,
     find_competitor_candidates_with_exa,
 )
+from .blacklist import SKIP_DOMAIN_KEYWORDS as _SKIP_DOMAIN_KEYWORDS
 from .search_service import extract_domain
 
 logger = logging.getLogger(__name__)
@@ -173,94 +174,6 @@ _CANDIDATE_PROFILE_SCHEMA: Dict[str, Any] = {
 
 # _SCORING_SCHEMA has been removed. Scoring now uses Python types from models.company_profile.
 # See services/competitor_scoring.py for the new scoring implementation.
-
-_SKIP_DOMAIN_KEYWORDS = (
-    # ── Software review / comparison platforms ──────────────────────────────
-    "g2.com",
-    "capterra",
-    "getapp",
-    "softwareadvice",
-    "trustradius",
-    "peerspot",
-    "trustpilot",
-    "comparably.com",
-    "clutch.co",
-    "sourceforge.net",
-    "alternativeto.net",
-    "producthunt.com",
-    "slashdot.org",
-    "crozdesk.com",
-    "selecthub.com",
-    "financesonline.com",
-    "softwaresuggest.com",
-    "spiceworks.com",
-    "saasworthy.com",
-    "technologyadvice.com",
-    "featuredcustomers.com",
-    # ── Analyst / market-research firms ─────────────────────────────────────
-    "gartner.com",
-    "forrester.com",
-    "cbinsights.com",
-    "pitchbook.com",
-    "idc.com",
-    "451research.com",
-    "aberdeen.com",
-    "everestgrp.com",
-    # ── Competitive-intelligence / data-enrichment tools ────────────────────
-    "zoominfo.com",
-    "similarweb.com",
-    "builtwith.com",
-    "stackshare.io",
-    "owler.com",
-    "craft.co",
-    "datanyze.com",
-    "slintel.com",
-    # ── Job boards / HR platforms ────────────────────────────────────────────
-    "glassdoor",
-    "indeed",
-    "builtin",
-    "ziprecruiter.com",
-    "monster.com",
-    "wellfound.com",
-    # ── Social media / communities ───────────────────────────────────────────
-    "linkedin",
-    "facebook",
-    "twitter",
-    "x.com",
-    "youtube",
-    "pinterest",
-    "reddit",
-    "medium.com",
-    "instagram",
-    "tiktok.com",
-    "quora.com",
-    # ── Business directories ─────────────────────────────────────────────────
-    "crunchbase",
-    "wikipedia",
-    "dnb.com",
-    "manta.com",
-    "bbb.org",
-    "yelp.com",
-    # ── Tech news / media outlets ────────────────────────────────────────────
-    "techcrunch.com",
-    "venturebeat.com",
-    "zdnet.com",
-    "techrepublic.com",
-    "theverge.com",
-    "wired.com",
-    "businessinsider.com",
-    "theregister.com",
-    "computerworld.com",
-    "infoworld.com",
-    "pcmag.com",
-    "techradar.com",
-    "darkreading.com",
-    # ── Press-release / wire services ────────────────────────────────────────
-    "businesswire.com",
-    "prnewswire.com",
-    "globenewswire.com",
-    "accesswire.com",
-)
 
 
 def _strip_html(value: str) -> str:

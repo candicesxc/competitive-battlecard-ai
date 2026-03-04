@@ -5,6 +5,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+from .blacklist import SKIP_DOMAIN_KEYWORDS as _SKIP_DOMAINS
 from .exa_client import cached_search_and_contents
 
 logger = logging.getLogger(__name__)
@@ -12,95 +13,6 @@ logger = logging.getLogger(__name__)
 
 class SearchProviderError(RuntimeError):
     """Custom exception raised when external search API calls fail."""
-
-
-_SKIP_DOMAINS = {
-    # ── Software review / comparison platforms ──────────────────────────────
-    "g2.com",
-    "capterra.com",
-    "getapp.com",
-    "softwareadvice.com",
-    "trustradius.com",
-    "peerspot.com",
-    "trustpilot.com",
-    "comparably.com",
-    "clutch.co",
-    "sourceforge.net",
-    "alternativeto.net",
-    "producthunt.com",
-    "slashdot.org",
-    "crozdesk.com",
-    "selecthub.com",
-    "financesonline.com",
-    "softwaresuggest.com",
-    "spiceworks.com",
-    "saasworthy.com",
-    "technologyadvice.com",
-    "featuredcustomers.com",
-    # ── Analyst / market-research firms ─────────────────────────────────────
-    "gartner.com",
-    "forrester.com",
-    "cbinsights.com",
-    "pitchbook.com",
-    "idc.com",
-    "451research.com",
-    "aberdeen.com",
-    "everestgrp.com",
-    # ── Competitive-intelligence / data-enrichment tools ────────────────────
-    "zoominfo.com",
-    "similarweb.com",
-    "builtwith.com",
-    "stackshare.io",
-    "owler.com",
-    "craft.co",
-    "datanyze.com",
-    "slintel.com",
-    # ── Job boards / HR platforms ────────────────────────────────────────────
-    "glassdoor.com",
-    "indeed.com",
-    "builtin.com",
-    "ziprecruiter.com",
-    "monster.com",
-    "wellfound.com",
-    # ── Social media / communities ───────────────────────────────────────────
-    "linkedin.com",
-    "facebook.com",
-    "twitter.com",
-    "x.com",
-    "instagram.com",
-    "youtube.com",
-    "pinterest.com",
-    "reddit.com",
-    "medium.com",
-    "tiktok.com",
-    "quora.com",
-    # ── Business directories ─────────────────────────────────────────────────
-    "crunchbase.com",
-    "wikipedia.org",
-    "dnb.com",
-    "manta.com",
-    "bbb.org",
-    "yelp.com",
-    # ── Tech news / media outlets ────────────────────────────────────────────
-    "techcrunch.com",
-    "venturebeat.com",
-    "zdnet.com",
-    "techrepublic.com",
-    "theverge.com",
-    "wired.com",
-    "businessinsider.com",
-    "theregister.com",
-    "computerworld.com",
-    "infoworld.com",
-    "pcmag.com",
-    "techradar.com",
-    "darkreading.com",
-    # ── Press-release / wire services ────────────────────────────────────────
-    "businesswire.com",
-    "prnewswire.com",
-    "globenewswire.com",
-    "accesswire.com",
-}
 
 
 def extract_domain(url: str) -> Optional[str]:
