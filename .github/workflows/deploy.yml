@@ -10,58 +10,59 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── Step 1: Sync API keys from GitHub Secrets → Render env vars ───────
-      # This is why your app lost the key: GitHub Secrets only live here.
-      # This step pushes them into your Render service before every deploy.
-      - name: Sync API keys to Render environment
+      # ── Step 1: Push API keys from GitHub Secrets into Render env vars ────
+      # This is the missing link: GitHub Secrets don't reach Render automatically.
+      # This step calls the Render API to update them before every deploy.
+      - name: Sync API keys to Render
         env:
-          OPENAI_API_KEY:       ${{ secrets.OPENAI_API_KEY }}
-          EXA_API_KEY:          ${{ secrets.EXA_API_KEY }}
-          RENDER_API_KEY:       ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_ID:    ${{ secrets.RENDER_SERVICE_ID }}
+          OPENAI_API_KEY:    ${{ secrets.OPENAI_API_KEY }}
+          EXA_API_KEY:       ${{ secrets.EXA_API_KEY }}
+          RENDER_API_KEY:    ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
         run: |
           python3 << 'EOF'
           import json, os, sys
           import urllib.request, urllib.error
 
-          required = ["OPENAI_API_KEY", "RENDER_API_KEY", "RENDER_SERVICE_ID"]
-          missing  = [k for k in required if not os.environ.get(k)]
+          missing = [k for k in ["OPENAI_API_KEY", "RENDER_API_KEY", "RENDER_SERVICE_ID"]
+                     if not os.environ.get(k)]
           if missing:
-              print(f"ERROR: Missing required secrets: {', '.join(missing)}")
-              print("Add them in GitHub → Settings → Secrets and variables → Actions")
+              print(f"ERROR: Missing GitHub Secrets: {', '.join(missing)}")
+              print("Add them at: GitHub repo → Settings → Secrets and variables → Actions")
               sys.exit(1)
 
-          # Build env-var list — only include keys that have values set
           env_vars = [{"key": "OPENAI_API_KEY", "value": os.environ["OPENAI_API_KEY"]}]
           if os.environ.get("EXA_API_KEY"):
               env_vars.append({"key": "EXA_API_KEY", "value": os.environ["EXA_API_KEY"]})
 
-          payload = json.dumps(env_vars).encode()
-          service_id = os.environ["RENDER_SERVICE_ID"]
-          url = f"https://api.render.com/v1/services/{service_id}/env-vars"
-
-          req = urllib.request.Request(url, data=payload, method="PUT")
-          req.add_header("Authorization", f"Bearer {os.environ['RENDER_API_KEY']}")
-          req.add_header("Content-Type", "application/json")
+          url = f'https://api.render.com/v1/services/{os.environ["RENDER_SERVICE_ID"]}/env-vars'
+          req = urllib.request.Request(url, data=json.dumps(env_vars).encode(), method='PUT')
+          req.add_header('Authorization', f'Bearer {os.environ["RENDER_API_KEY"]}')
+          req.add_header('Content-Type', 'application/json')
 
           try:
               with urllib.request.urlopen(req) as resp:
-                  print(f"Env vars synced to Render — HTTP {resp.status}")
+                  print(f'API keys synced to Render — HTTP {resp.status}')
           except urllib.error.HTTPError as e:
-              body = e.read().decode()
-              print(f"Failed to sync env vars: HTTP {e.code}\n{body}")
+              print(f'Failed to sync env vars: HTTP {e.code}')
+              print(e.read().decode())
               sys.exit(1)
           EOF
 
       # ── Step 2: Trigger a new Render deployment ────────────────────────────
       - name: Trigger Render deployment
         env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          RENDER_API_KEY:    ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
         run: |
-          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
-            echo "RENDER_DEPLOY_HOOK_URL secret not set — skipping deploy trigger."
-            echo "Get it from: Render dashboard → your service → Settings → Deploy Hook"
+          response=$(curl -sf -w "\n%{http_code}" -X POST \
+            "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          http_code=$(echo "$response" | tail -n1)
+          if [ "$http_code" != "201" ] && [ "$http_code" != "200" ]; then
+            echo "Deploy trigger failed: HTTP $http_code"
             exit 1
           fi
-          curl -sf -X POST "$RENDER_DEPLOY_HOOK_URL"
-          echo "Deploy triggered on Render."
+          echo "Render deploy triggered successfully."
