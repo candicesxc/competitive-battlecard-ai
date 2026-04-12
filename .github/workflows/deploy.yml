@@ -1,0 +1,67 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: # allows manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Step 1: Sync API keys from GitHub Secrets → Render env vars ───────
+      # This is why your app lost the key: GitHub Secrets only live here.
+      # This step pushes them into your Render service before every deploy.
+      - name: Sync API keys to Render environment
+        env:
+          OPENAI_API_KEY:       ${{ secrets.OPENAI_API_KEY }}
+          EXA_API_KEY:          ${{ secrets.EXA_API_KEY }}
+          RENDER_API_KEY:       ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID:    ${{ secrets.RENDER_SERVICE_ID }}
+        run: |
+          python3 << 'EOF'
+          import json, os, sys
+          import urllib.request, urllib.error
+
+          required = ["OPENAI_API_KEY", "RENDER_API_KEY", "RENDER_SERVICE_ID"]
+          missing  = [k for k in required if not os.environ.get(k)]
+          if missing:
+              print(f"ERROR: Missing required secrets: {', '.join(missing)}")
+              print("Add them in GitHub → Settings → Secrets and variables → Actions")
+              sys.exit(1)
+
+          # Build env-var list — only include keys that have values set
+          env_vars = [{"key": "OPENAI_API_KEY", "value": os.environ["OPENAI_API_KEY"]}]
+          if os.environ.get("EXA_API_KEY"):
+              env_vars.append({"key": "EXA_API_KEY", "value": os.environ["EXA_API_KEY"]})
+
+          payload = json.dumps(env_vars).encode()
+          service_id = os.environ["RENDER_SERVICE_ID"]
+          url = f"https://api.render.com/v1/services/{service_id}/env-vars"
+
+          req = urllib.request.Request(url, data=payload, method="PUT")
+          req.add_header("Authorization", f"Bearer {os.environ['RENDER_API_KEY']}")
+          req.add_header("Content-Type", "application/json")
+
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  print(f"Env vars synced to Render — HTTP {resp.status}")
+          except urllib.error.HTTPError as e:
+              body = e.read().decode()
+              print(f"Failed to sync env vars: HTTP {e.code}\n{body}")
+              sys.exit(1)
+          EOF
+
+      # ── Step 2: Trigger a new Render deployment ────────────────────────────
+      - name: Trigger Render deployment
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL secret not set — skipping deploy trigger."
+            echo "Get it from: Render dashboard → your service → Settings → Deploy Hook"
+            exit 1
+          fi
+          curl -sf -X POST "$RENDER_DEPLOY_HOOK_URL"
+          echo "Deploy triggered on Render."
