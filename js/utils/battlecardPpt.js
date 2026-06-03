@@ -338,9 +338,21 @@
 
   // ── Main export ───────────────────────────────────────────────────────────
 
+  // PptxGenJS may be exposed under different names depending on how the UMD
+  // bundle initialises in the browser environment.
+  function resolvePptxGenJS() {
+    return (typeof PptxGenJS !== 'undefined' && PptxGenJS) ||
+           (typeof window.PptxGenJS !== 'undefined' && window.PptxGenJS) ||
+           (typeof pptxgen !== 'undefined' && pptxgen) ||
+           (typeof window.pptxgen !== 'undefined' && window.pptxgen) ||
+           null;
+  }
+
   function generateBattlecardPpt(battlecard, rawData) {
-    if (typeof PptxGenJS === 'undefined') {
-      alert('PptxGenJS library is not loaded. Please refresh the page and try again.');
+    const Ctor = resolvePptxGenJS();
+    if (!Ctor) {
+      console.error('PptxGenJS not found on window. Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('pptx') || k.toLowerCase().includes('pptgen')));
+      alert('PowerPoint library failed to load. Please check your internet connection and refresh the page.');
       return;
     }
 
@@ -355,7 +367,7 @@
       year: 'numeric', month: 'long', day: 'numeric',
     });
 
-    const pptx = new PptxGenJS();
+    const pptx = new Ctor();
     pptx.layout  = 'LAYOUT_WIDE';
     pptx.author  = 'Competitive Battlecard AI';
     pptx.company = companyName;
