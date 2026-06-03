@@ -35,6 +35,11 @@ SKIP_DOMAIN_KEYWORDS: tuple[str, ...] = (
     "saasworthy.com",
     "technologyadvice.com",
     "featuredcustomers.com",
+    "expertinsights.com",       # Review / comparison site
+    "itcentralstation.com",     # Now merged into PeerSpot
+    "softwareworld.co",
+    "getvoip.com",
+    "techscore.io",
     # ── Analyst / market-research firms ─────────────────────────────────────
     "gartner.com",
     "forrester.com",
@@ -44,6 +49,22 @@ SKIP_DOMAIN_KEYWORDS: tuple[str, ...] = (
     "451research.com",
     "aberdeen.com",
     "everestgrp.com",
+    "mckinsey.com",
+    "bcg.com",
+    "bain.com",
+    "deloitte.com",
+    "accenture.com",
+    "pwc.com",
+    "kpmg.com",
+    "ey.com",
+    "frost.com",               # Frost & Sullivan
+    "omdia.com",               # Omdia analyst
+    "radicalventures.com",
+    "marketsandmarkets.com",
+    "mordorintelligence.com",
+    "grandviewresearch.com",
+    "statista.com",
+    "ibisworld.com",
     # ── Competitive-intelligence / startup-intelligence tools ────────────────
     "zoominfo.com",
     "similarweb.com",
@@ -58,6 +79,10 @@ SKIP_DOMAIN_KEYWORDS: tuple[str, ...] = (
     "harmonic.ai",
     "dealroom.co",
     "mattermark.com",
+    "klue.com",                # Competitive enablement tool
+    "crayon.co",               # Competitive intelligence tool
+    "kompyte.com",
+    "battlecard.io",
     # ── Job boards / HR platforms ────────────────────────────────────────────
     "glassdoor",
     "indeed",
@@ -65,6 +90,8 @@ SKIP_DOMAIN_KEYWORDS: tuple[str, ...] = (
     "ziprecruiter.com",
     "monster.com",
     "wellfound.com",
+    "levels.fyi",
+    "payscale.com",
     # ── Social media / communities ───────────────────────────────────────────
     "linkedin",
     "facebook",
@@ -77,14 +104,25 @@ SKIP_DOMAIN_KEYWORDS: tuple[str, ...] = (
     "instagram",
     "tiktok.com",
     "quora.com",
+    "substack.com",
+    "dev.to",
+    "hashnode.com",
     # ── Business directories / encyclopedias ─────────────────────────────────
     "crunchbase",
     "wikipedia",
-    "wikiwand.com",       # Wikipedia reader / mirror (e.g. CB Insights page)
+    "wikiwand.com",
     "dnb.com",
     "manta.com",
     "bbb.org",
     "yelp.com",
+    "bloomberg.com",
+    "reuters.com",
+    "ft.com",                  # Financial Times
+    "wsj.com",                 # Wall Street Journal
+    "forbes.com",
+    "fortune.com",
+    "inc.com",
+    "entrepreneur.com",
     # ── Tech news / media outlets ────────────────────────────────────────────
     "techcrunch.com",
     "venturebeat.com",
@@ -99,18 +137,35 @@ SKIP_DOMAIN_KEYWORDS: tuple[str, ...] = (
     "pcmag.com",
     "techradar.com",
     "darkreading.com",
+    "securityweek.com",        # Security news site
+    "csoonline.com",           # CSO / security news
+    "helpnetsecurity.com",     # Security news
+    "bleepingcomputer.com",    # Security news
+    "infosecurity-magazine.com",
+    "scmagazine.com",          # SC Magazine security news
+    "securityboulevard.com",
+    "therecord.media",         # Cybersecurity news
+    "cyberscoop.com",          # Cybersecurity news
+    "govinfosecurity.com",
+    "bankinfosecurity.com",
+    "databreachtoday.com",
+    "ismg.io",                 # Information Security Media Group network
     # ── Press-release / wire services ────────────────────────────────────────
     "businesswire.com",
     "prnewswire.com",
     "globenewswire.com",
     "accesswire.com",
-    "openpr.com",          # Press-release aggregator
+    "openpr.com",
+    "einpresswire.com",
+    "prweb.com",
     # ── AI-tools / SaaS-directory aggregators ────────────────────────────────
-    "whattheai.tech",      # AI tools directory (hosts ChampSignal profiles)
-    "champsignal.com",     # Sales intelligence / competitive signal tool
+    "whattheai.tech",
+    "champsignal.com",
     "theresanaiforthat.com",
     "futurepedia.io",
     "aitoptools.com",
+    "topai.tools",
+    "aitoolhunt.com",
 )
 
 # ---------------------------------------------------------------------------
@@ -122,7 +177,7 @@ SKIP_DOMAIN_KEYWORDS: tuple[str, ...] = (
 # ---------------------------------------------------------------------------
 NON_COMPETITOR_NAME_FRAGMENTS: tuple[str, ...] = (
     # Review / comparison platforms
-    "g2",
+    "g2crowd",
     "capterra",
     "getapp",
     "softwareadvice",
@@ -141,16 +196,33 @@ NON_COMPETITOR_NAME_FRAGMENTS: tuple[str, ...] = (
     "saasworthy",
     "technologyadvice",
     "featuredcustomers",
+    "expertinsights",
+    "itcentralstation",
+    "softwareworld",
     # Analyst / research firms
     "gartner",
     "forrester",
-    "idc",
+    "idc",                  # IDC analyst firm
     "cbinsights",
     "cbinsight",
     "pitchbook",
     "gartnergroup",
     "451research",
     "everestgrp",
+    "mckinsey",
+    "bcggroup",
+    "bain&company",
+    "deloitte",
+    "accenture",
+    "pwcgroup",             # PwC (avoid bare "pwc" which is too short)
+    "kpmg",
+    "frostandsullivan",
+    "marketsandmarkets",
+    "mordorintelligence",
+    "grandviewresearch",
+    "statista",
+    "ibisworld",
+    "omdia",
     # Competitive-intelligence / startup-intelligence tools
     "zoominfo",
     "similarweb",
@@ -161,13 +233,19 @@ NON_COMPETITOR_NAME_FRAGMENTS: tuple[str, ...] = (
     "tracxn",
     "growjo",
     "dealroom",
+    "klue",
+    "kompyte",
     # Business directories / encyclopedias
     "wikiwand",
+    "crunchbase",
+    "bloomberg",
+    "reuters",
+    "forbes",
     # AI-tools / SaaS-directory aggregators
     "whattheai",
     "champsignal",
     "futurepedia",
-    # Tech news / media
+    # Tech news / media outlets
     "techcrunch",
     "venturebeat",
     "infoq",
@@ -176,9 +254,18 @@ NON_COMPETITOR_NAME_FRAGMENTS: tuple[str, ...] = (
     "pcmag",
     "techradar",
     "darkreading",
+    "securityweek",
+    "csoonline",
+    "helpnetsecurity",
+    "bleepingcomputer",
+    "infosecuritymagazine",
+    "scmagazine",
+    "securityboulevard",
+    "cyberscoop",
     # Press release / wire services
     "businesswire",
     "prnewswire",
     "globenewswire",
     "openpr",
+    "prweb",
 )

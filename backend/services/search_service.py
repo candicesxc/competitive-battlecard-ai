@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from .blacklist import SKIP_DOMAIN_KEYWORDS as _SKIP_DOMAINS
+from .blacklist import NON_COMPETITOR_NAME_FRAGMENTS as _NON_COMPETITOR_NAMES
 from .exa_client import cached_search_and_contents
 
 logger = logging.getLogger(__name__)
@@ -150,6 +151,22 @@ async def search_company_news(company_name: str, limit: int = 5) -> Dict[str, An
     return await _search_request("news", payload)
 
 
+def _is_blacklisted_candidate(name: Optional[str], url: Optional[str]) -> bool:
+    """Return True if the candidate is a known non-competitor by name or domain."""
+    if url:
+        try:
+            domain = urlparse(url).netloc.lower().replace("www.", "")
+            if any(kw in domain for kw in _SKIP_DOMAINS):
+                return True
+        except Exception:
+            pass
+    if name:
+        normalized = name.lower().strip().replace(" ", "").replace(".", "").replace("-", "").replace(",", "")
+        if any(frag in normalized for frag in _NON_COMPETITOR_NAMES):
+            return True
+    return False
+
+
 def parse_competitor_candidates(
     search_results: Dict[str, Any],
     *,
@@ -180,11 +197,14 @@ def parse_competitor_candidates(
     # First, leverage knowledge graph "people also search for"
     for related in knowledge_graph.get("peopleAlsoSearchFor", []):
         url = related.get("link")
+        name = related.get("title")
         if _is_duplicate(url) or _is_target_domain(url):
+            continue
+        if _is_blacklisted_candidate(name, url):
             continue
         competitors.append(
             {
-                "name": related.get("title"),
+                "name": name,
                 "url": url,
                 "snippet": related.get("snippet") or related.get("description"),
             }
@@ -194,10 +214,13 @@ def parse_competitor_candidates(
 
     for result in organic_results:
         url = result.get("link")
+        name = result.get("title")
         if _is_duplicate(url) or _is_target_domain(url):
             continue
+        if _is_blacklisted_candidate(name, url):
+            continue
         competitor = {
-            "name": result.get("title"),
+            "name": name,
             "url": url,
             "snippet": result.get("snippet"),
         }
