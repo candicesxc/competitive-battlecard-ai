@@ -51,8 +51,11 @@ Your job is to compare each competitor to the target and evaluate:
    - Lower if audience is different.
 
 4. size_similarity (0 to 100):
-   - 100 if similar company size (for example both midmarket or both enterprise).
-   - Lower if very different in scale.
+   - 100 if the competitor is the same size OR larger than the target (a larger company
+     that sells the same product is always a meaningful competitor the target must defend against).
+   - 70-90 if one tier smaller (e.g., target is enterprise, competitor is midmarket).
+   - 30-60 if much smaller (tiny startup vs. established enterprise).
+   - Prefer companies that are at least as large as the target.
 
 5. business_model_similarity (0 to 100):
    - 100 if they use the same business model (for example both B2B SaaS).
@@ -98,11 +101,17 @@ Rules:
 - Only mark a company as "direct" if the product and target audience are clearly similar.
 - Prefer companies that sell similar products, to similar customers, in the same industry and size band.
 - If in doubt, lower the similarity_score instead of inflating it.
-- HARD FILTER — assign competitor_type "irrelevant" if EITHER of these is true:
+- HARD FILTER — assign competitor_type "irrelevant" if ANY of these is true:
     (a) industry_similarity < 40  (clearly different market vertical)
-    (b) product_similarity < 50   (different core product category)
+    (b) product_similarity < 55   (different core product category — the products must be
+        meaningfully similar, not just in the same broad domain)
+    (c) size_similarity < 25 AND competitor_type would otherwise be "direct" (a company
+        that is far too small to be a real competitive threat is not a direct competitor)
   Off-industry or off-product candidates that share only a company name or generic
   keywords with the target must be marked "irrelevant" regardless of other scores.
+- SIZE PREFERENCE — When ranking, prefer competitors that are at least as large as the
+  target company. A well-known larger player in the same space is always a more relevant
+  competitor than a small startup with a similar product.
 
 Return a single JSON array of these objects, with no extra text or markdown."""
 
@@ -218,8 +227,8 @@ Return a JSON array of scored competitors matching the format described above.""
 
             # Enforce the hard filter in code — the LLM may return a non-"irrelevant"
             # type even when scores are clearly too low.
-            # product_similarity threshold raised to 50: the core product sold must match.
-            if industry_sim < 40 or product_sim < 50:
+            # product_similarity threshold: the core product sold must match.
+            if industry_sim < 40 or product_sim < 55:
                 competitor_type = "irrelevant"
 
             # Name-based blocklist: review platforms, analyst firms, media outlets, etc.
