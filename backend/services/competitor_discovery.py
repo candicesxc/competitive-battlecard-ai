@@ -48,6 +48,7 @@ async def _collect_search_snippets_for_company(
     name = profile.get("name", "")
     industry = profile.get("industry", "")
     target_audience = profile.get("target_audience", "")
+    core_products = profile.get("core_products") or []
 
     # Build search queries that anchor on the company's market *category*, not just
     # its name.  Using only "{name} competitors" can badly misfire for common
@@ -60,7 +61,7 @@ async def _collect_search_snippets_for_company(
 
     queries: List[str] = []
 
-    # --- Category-first queries (most reliable) ---
+    # --- Category-first queries (most reliable signal) ---
     if sub_industry:
         if target_audience:
             queries.append(f"best {sub_industry} platforms for {target_audience}")
@@ -71,6 +72,12 @@ async def _collect_search_snippets_for_company(
         else:
             queries.append(f"top {industry} tools")
 
+    # --- Comparison-intent queries: surface who the target is ACTUALLY compared against ---
+    # These queries hit head-to-head articles and "X vs Y" pages that name real competitors.
+    if name:
+        queries.append(f"alternatives to {name}")
+        queries.append(f"{name} vs")
+
     # --- Name + category query (avoids pure name ambiguity) ---
     if name:
         if sub_industry:
@@ -80,10 +87,14 @@ async def _collect_search_snippets_for_company(
         else:
             queries.append(f"{name} competitors")
 
+    # --- Core product query (product-level competitor signal) ---
+    if core_products:
+        queries.append(f"{core_products[0]} alternative")
+
     # Execute searches sequentially to respect rate limiting
     # The rate limiter will ensure proper spacing between calls
     search_results_list = []
-    for query in queries[:3]:  # Limit to 3 queries
+    for query in queries[:5]:  # Allow up to 5 queries for better coverage
         try:
             result = await cached_search_and_contents(
                 query,
@@ -96,7 +107,7 @@ async def _collect_search_snippets_for_company(
             search_results_list.append(exc)
 
     try:
-        for query, results in zip(queries[:3], search_results_list):
+        for query, results in zip(queries[:5], search_results_list):
             if isinstance(results, Exception):
                 logger.warning("Exa search failed for '%s': %s", query, results)
                 continue

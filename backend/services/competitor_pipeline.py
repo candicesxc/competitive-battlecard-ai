@@ -42,6 +42,15 @@ Your job is to deeply understand what the company does and return a structured J
 
 Use these rules:
 - Infer industry and sub_industry from the product and customer.
+- sub_industry MUST be highly specific — narrow enough to distinguish competing product categories
+  within the same broad industry. Examples of good sub_industry values:
+    * Security: "application security / DevSecOps", "endpoint detection and response (EDR)",
+      "cloud security posture management (CSPM)", "identity and access management (IAM)",
+      "network security", "SIEM / threat detection", "vulnerability management"
+    * Data: "data observability", "data pipeline / ETL", "business intelligence", "data governance"
+    * HR: "payroll software", "workforce management", "employee engagement", "ATS / recruiting"
+    * Fintech: "earned wage access", "spend management", "accounts payable automation", "lending"
+  Do NOT use broad labels like "cybersecurity", "software", "SaaS", or "technology" as sub_industry.
 - Infer company_size roughly (startup, midmarket, enterprise) based on language, customer logos, and tone.
 - Infer business_model (B2B SaaS, B2C, marketplace, hardware, services, other).
 - Describe the target_audience in natural language (for example: "enterprise security teams" or "small ecommerce brands").

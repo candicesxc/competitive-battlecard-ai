@@ -145,6 +145,11 @@ async def find_competitor_candidates_with_exa(
         else:
             queries.append(f"best {industry} platforms")
 
+    # --- Comparison-intent queries: hit head-to-head articles naming real competitors ---
+    if name:
+        queries.append(f"alternatives to {name}")
+        queries.append(f"{name} vs")
+
     # --- Name + category query (avoids pure name ambiguity) ---
     if name:
         if sub_industry:
@@ -162,7 +167,7 @@ async def find_competitor_candidates_with_exa(
     # Use sequential calls instead of gather to respect rate limiting
     # The rate limiter will ensure proper spacing between calls
     search_results_list = []
-    for query in queries[:4]:  # Limit to 4 queries to control costs
+    for query in queries[:6]:  # Allow up to 6 queries for better coverage
         try:
             result = await cached_search_and_contents(
                 query,
@@ -176,7 +181,7 @@ async def find_competitor_candidates_with_exa(
 
     try:
 
-        for query, results in zip(queries[:4], search_results_list):
+        for query, results in zip(queries[:6], search_results_list):
             if isinstance(results, Exception):
                 logger.warning("Exa search failed for '%s': %s", query, results)
                 continue
