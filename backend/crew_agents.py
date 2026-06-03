@@ -162,6 +162,7 @@ class BattlecardCrew:
                         "size_similarity": scored.get("size_similarity", 0.0),
                         "business_model_similarity": scored.get("business_model_similarity", 0.0),
                         "competitor_type": scored.get("competitor_type", "adjacent"),
+                        "competition_mode": scored.get("competition_mode", "direct_product"),
                         "reason_for_similarity": scored.get("reason_for_similarity", ""),
                         "competitive_score": max(
                             1, min(10, round(scored.get("similarity_score", 0.0) / 10.0))

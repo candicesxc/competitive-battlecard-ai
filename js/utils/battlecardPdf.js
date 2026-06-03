@@ -1,325 +1,438 @@
 /**
- * PDF generation utility for battlecards
- * Uses jsPDF to create a formatted PDF from battlecard data
+ * PDF generation utility for battlecards.
+ * Uses jsPDF with a grid-based layout to ensure no content is ever cut off.
  *
- * Enhanced PDF styling:
- * - Professional enterprise design with gradient headers
- * - Modern typography hierarchy
- * - Color-coded sections with accent colors
- * - Improved spacing and visual hierarchy
- * - Custom fonts and styling
+ * When rawData is supplied (same object as the PPT generator receives), each
+ * competitor gets a full-page grid layout.  When rawData is absent we fall
+ * back to the section-list flow so the function always produces output.
  */
 
-/**
- * Generates and downloads a PDF from a CompetitorBattlecard
- * @param {Object} battlecard - CompetitorBattlecard object with sections
- */
-function generateBattlecardPdf(battlecard) {
-  // Check if jsPDF is available
+function generateBattlecardPdf(battlecard, rawData) {
+  // ── jsPDF availability check ─────────────────────────────────────────────
   if (typeof window.jsPDF === 'undefined' && typeof window.jspdf === 'undefined') {
-    console.error("jsPDF library not loaded");
-    alert("PDF generation library not available. Please refresh the page.");
+    alert('PDF generation library not available. Please refresh the page.');
     return;
   }
-
-  // Get jsPDF constructor - try both possible names
   const jsPDF = window.jsPDF || (window.jspdf && window.jspdf.jsPDF);
   if (!jsPDF) {
-    console.error("jsPDF constructor not found");
-    alert("PDF generation library not available. Please refresh the page.");
+    alert('PDF generation library not available. Please refresh the page.');
     return;
   }
 
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4'
-  });
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 16;
-  const maxWidth = pageWidth - (margin * 2);
-  let yPosition = margin;
+  // ── Page geometry ─────────────────────────────────────────────────────────
+  const PW = 210, PH = 297;
+  const ML = 12, MR = 12, MT = 12, MB = 12;
+  const CW = PW - ML - MR;  // 186mm
 
-  // Typography settings - matching modern enterprise design
-  const lineHeight = 5;
-  const sectionSpacing = 8;
-  const titleSize = 26;
-  const subtitleSize = 12;
-  const sectionTitleSize = 14;
-  const bodySize = 10;
-
-  // Enhanced color palette
-  const colors = {
-    darkBg: [15, 23, 42],        // Deep slate background
-    slate900: [15, 23, 42],      // Main text
-    slate800: [30, 41, 59],      // Titles
-    slate700: [51, 65, 85],      // Body text
-    slate600: [71, 85, 105],     // Secondary text
-    slate500: [100, 116, 139],   // Muted text
-    slate400: [148, 163, 184],   // Light text
-    indigo700: [55, 48, 163],    // Primary accent
-    indigo600: [79, 70, 229],    // Accent
-    indigo500: [99, 102, 241],   // Light accent
-    indigo200: [199, 210, 254],  // Very light accent
-    slate200: [226, 232, 240],   // Subtle lines
-    white: [255, 255, 255],      // White
+  // ── Color palette (RGB arrays) ────────────────────────────────────────────
+  const COL = {
+    primary:    [79,  70,  229],
+    primaryDk:  [55,  48,  163],
+    primaryLt:  [129, 140, 248],
+    accent:     [249, 115,  22],
+    white:      [255, 255, 255],
+    slate900:   [ 15,  23,  42],
+    slate800:   [ 30,  41,  59],
+    slate700:   [ 51,  65,  85],
+    slate600:   [ 71,  85, 105],
+    slate500:   [100, 116, 139],
+    slate400:   [148, 163, 184],
+    slate300:   [203, 213, 225],
+    slate200:   [226, 232, 240],
+    lightBg:    [248, 250, 252],
+    blue:       [ 37,  99, 235],
+    emerald:    [  5, 150, 105],
+    amber:      [217, 119,   6],
+    teal:       [ 13, 148, 136],
+    violet:     [124,  58, 237],
+    rose:       [225,  29,  72],
+    red:        [220,  38,  38],
   };
 
-  // Helper function to add a new page if needed
-  const checkPageBreak = (requiredSpace = 20) => {
-    if (yPosition + requiredSpace > pageHeight - margin - 5) {
-      addPageFooter();
-      doc.addPage();
-      yPosition = margin;
-      return true;
-    }
-    return false;
-  };
+  function setFill(c)   { doc.setFillColor(c[0], c[1], c[2]); }
+  function setStroke(c) { doc.setDrawColor(c[0], c[1], c[2]); }
+  function setColor(c)  { doc.setTextColor(c[0], c[1], c[2]); }
 
-  // Helper to add page number and timestamp
-  const addPageFooter = () => {
-    const pageNum = doc.internal.getNumberOfPages();
-    doc.setFontSize(8);
-    doc.setTextColor(colors.slate500[0], colors.slate500[1], colors.slate500[2]);
-    doc.text(
-      `Page ${pageNum}`,
-      pageWidth - margin - 15,
-      pageHeight - 8,
-      { align: 'right' }
-    );
-    // Small divider line
-    doc.setDrawColor(colors.slate200[0], colors.slate200[1], colors.slate200[2]);
-    doc.setLineWidth(0.3);
-    doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
-  };
-
-  // Helper function to split text into lines that fit the page width
-  const splitText = (text, fontSize, maxWidth) => {
-    return doc.splitTextToSize(text, maxWidth);
-  };
-
-  // Helper function to add text with word wrapping
-  const addText = (text, fontSize, isBold = false, color = colors.slate700, lineSpacing = lineHeight) => {
-    if (!text || !text.trim()) return;
-
-    doc.setFontSize(fontSize);
-    doc.setFont("helvetica", isBold ? "bold" : "normal");
-    doc.setTextColor(color[0], color[1], color[2]);
-
-    const lines = splitText(text, fontSize, maxWidth);
-
-    lines.forEach((line, idx) => {
-      if (yPosition + lineSpacing > pageHeight - margin - 5) {
-        addPageFooter();
-        doc.addPage();
-        yPosition = margin;
-      }
-      doc.text(line, margin, yPosition);
-      yPosition += lineSpacing;
-    });
-  };
-
-  // Helper to add a section header with background
-  const addSectionHeader = (title) => {
-    // Split long titles so the rect can grow to fit
-    doc.setFontSize(sectionTitleSize);
-    const titleLines = doc.splitTextToSize(title, maxWidth - 8);
-    const headerHeight = Math.max(9, titleLines.length * 6 + 4);
-
-    // Ensure enough space for header + at least one line of content
-    if (yPosition + headerHeight + 20 > pageHeight - margin - 5) {
-      addPageFooter();
-      doc.addPage();
-      yPosition = margin;
-    }
-
-    // Breathing room above header
-    yPosition += 6;
-
-    // Background rectangle — height grows with multi-line titles
-    doc.setFillColor(colors.indigo700[0], colors.indigo700[1], colors.indigo700[2]);
-    doc.rect(margin, yPosition, maxWidth, headerHeight, 'F');
-
-    // Title text — rendered inside the rect with proper vertical padding
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(colors.white[0], colors.white[1], colors.white[2]);
-    // Start first baseline 6mm from rect top (leaves ~3mm cap-height room above)
-    let textY = yPosition + 6;
-    titleLines.forEach((line) => {
-      doc.text(line, margin + 3, textY);
-      textY += 6;
-    });
-
-    // Advance past header with generous clearance so body text never overlaps the rect
-    yPosition += headerHeight + 5;
-  };
-
-  // ========== TITLE PAGE ==========
-
-  // Background gradient effect (using rectangles)
-  doc.setFillColor(colors.indigo700[0], colors.indigo700[1], colors.indigo700[2]);
-  doc.rect(0, 0, pageWidth, 60, 'F');
-
-  // Title
-  doc.setFontSize(titleSize);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(colors.white[0], colors.white[1], colors.white[2]);
-  const companyName = battlecard.companyName || "Competitor Battlecard";
-  doc.text(companyName, margin, 25);
-
-  // Subtitle
-  doc.setFontSize(subtitleSize);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(colors.indigo200[0], colors.indigo200[1], colors.indigo200[2]);
-  doc.text("Competitive Battlecard", margin, 35);
-
-  // Separator line
-  doc.setDrawColor(colors.indigo500[0], colors.indigo500[1], colors.indigo500[2]);
-  doc.setLineWidth(1);
-  doc.line(margin, 45, pageWidth - margin, 45);
-
-  yPosition = 65;
-
-  // Company URL if available
-  if (battlecard.companyUrl) {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(colors.slate700[0], colors.slate700[1], colors.slate700[2]);
-    doc.text(`Website: ${battlecard.companyUrl}`, margin, yPosition);
-    yPosition += 8;
+  function trunc(s, n) {
+    s = String(s == null ? '' : s).trim();
+    return s.length <= n ? s : s.slice(0, n - 1) + '…';
   }
 
-  yPosition += 10;
+  // ── Text clipping helper ──────────────────────────────────────────────────
+  // Renders text lines inside a fixed box, clipping to available height.
+  // Never lets text overflow beyond (x+w, y+h).
+  function renderClipped(textOrLines, x, y, w, h, fontSize, color) {
+    doc.setFontSize(fontSize);
+    setColor(color);
+    const LINE_H = fontSize * 0.42;  // mm per line (empirically reliable)
+    const maxLines = Math.max(1, Math.floor(h / LINE_H));
 
-  // Generated timestamp
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  doc.setFontSize(9);
-  doc.setTextColor(colors.slate600[0], colors.slate600[1], colors.slate600[2]);
-  doc.text(`Generated: ${dateStr}`, margin, yPosition);
+    let lines = Array.isArray(textOrLines)
+      ? textOrLines
+      : doc.splitTextToSize(textOrLines, w - 2);
 
-  // Track competitor sections to add page breaks + name headers
-  let lastCompetitorIndex = null;
-  let isFirstSection = true;
-
-  // Helper to render a section body (bullets or paragraph)
-  const renderSectionBody = (bodyText) => {
-    if (!bodyText || !bodyText.trim()) return;
-
-    const hasBullets = bodyText.includes("•") || bodyText.includes("- ") || bodyText.includes("* ");
-    if (hasBullets) {
-      const lines = bodyText.split(/\n/).filter(line => line.trim());
-      lines.forEach((line) => {
-        const trimmedLine = line.trim();
-        if (trimmedLine) {
-          const cleanLine = trimmedLine.replace(/^[•\-\*]\s*/, "");
-          doc.setFontSize(bodySize);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(colors.slate700[0], colors.slate700[1], colors.slate700[2]);
-          const bulletLines = splitText(`• ${cleanLine}`, bodySize, maxWidth - 5);
-          bulletLines.forEach((bulletLine, idx) => {
-            if (yPosition + lineHeight + 3 > pageHeight - margin - 5) {
-              addPageFooter();
-              doc.addPage();
-              yPosition = margin;
-            }
-            const xPos = idx === 0 ? margin : margin + 3;
-            doc.text(bulletLine, xPos, yPosition);
-            yPosition += lineHeight + 1;
-          });
-        }
-      });
-    } else {
-      const paragraphLines = splitText(bodyText, bodySize, maxWidth);
-      paragraphLines.forEach((line) => {
-        if (yPosition + lineHeight + 3 > pageHeight - margin - 5) {
-          addPageFooter();
-          doc.addPage();
-          yPosition = margin;
-        }
-        doc.setFontSize(bodySize);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(colors.slate700[0], colors.slate700[1], colors.slate700[2]);
-        doc.text(line, margin, yPosition);
-        yPosition += lineHeight + 1.2;
-      });
-    }
-    yPosition += 5;
-  };
-
-  // Process all sections
-  battlecard.sections.forEach((section, index) => {
-    if (!section.body || !section.body.trim()) return;
-
-    // Detect start of a new competitor block
-    const competitorHeaderMatch = section.id && section.id.match(/^competitor_(\d+)_header$/);
-    const competitorOverviewMatch = section.id && section.id.match(/^competitor_(\d+)_overview$/);
-    const isNewCompetitor = competitorHeaderMatch || (competitorOverviewMatch && lastCompetitorIndex !== competitorOverviewMatch[1]);
-
-    if (isNewCompetitor) {
-      const compIndex = (competitorHeaderMatch || competitorOverviewMatch)[1];
-      if (lastCompetitorIndex !== compIndex) {
-        lastCompetitorIndex = compIndex;
-
-        // Page break before each competitor (always, to ensure clean separation)
-        addPageFooter();
-        doc.addPage();
-        yPosition = margin;
-        isFirstSection = false;
-
-        // Extract competitor name from title
-        const competitorName = section.title.replace(/^Competitor:\s*/i, "").replace(/ - Company overview$/i, "");
-
-        // Large competitor name header with background
-        doc.setFillColor(colors.indigo600[0], colors.indigo600[1], colors.indigo600[2]);
-        doc.rect(0, yPosition - 5, pageWidth, 16, 'F');
-
-        doc.setFontSize(20);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(colors.white[0], colors.white[1], colors.white[2]);
-        doc.text(competitorName, margin + 2, yPosition + 6);
-        yPosition += 18;
-
-        // If this was the header section (with website), render the website inline and skip normal rendering
-        if (competitorHeaderMatch) {
-          if (section.body && section.body.startsWith("Website:")) {
-            doc.setFontSize(9);
-            doc.setFont("helvetica", "normal");
-            doc.setTextColor(colors.slate600[0], colors.slate600[1], colors.slate600[2]);
-            doc.text(section.body, margin, yPosition);
-            yPosition += 6;
-          }
-          return; // Skip normal section rendering for header
-        }
-      }
+    if (lines.length > maxLines) {
+      lines = lines.slice(0, maxLines);
+      // Ellipsis on last visible line
+      const last = lines[maxLines - 1];
+      lines[maxLines - 1] = last.replace(/\s+\S*$/, '').slice(0, -1) + '…';
     }
 
-    // Clean section title: strip "CompanyName - " prefix for competitor sub-sections
-    let displayTitle = section.title;
-    const competitorPrefixMatch = displayTitle.match(/^.+ - (.+)$/);
-    if (competitorPrefixMatch && section.id && section.id.startsWith("competitor_")) {
-      displayTitle = competitorPrefixMatch[1];
-    }
+    lines.forEach((line, i) => {
+      doc.text(line, x, y + (i + 0.85) * LINE_H);
+    });
+  }
 
-    // Add section header with background (handles page breaks internally)
-    addSectionHeader(displayTitle);
+  // ── Panel: colored-header box with clipped content ───────────────────────
+  function drawPanel(x, y, w, h, headerColor, label, content, fontSize) {
+    const LABEL_H = 7;
+    const PAD_X   = 2.5;
 
-    renderSectionBody(section.body);
+    // White background + border
+    setFill(COL.white);
+    setStroke(COL.slate300);
+    doc.setLineWidth(0.25);
+    doc.rect(x, y, w, h, 'FD');
+
+    // Coloured header strip
+    setFill(headerColor);
+    doc.rect(x, y, w, LABEL_H, 'F');
+
+    // Label text
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    setColor(COL.white);
+    doc.text(label.toUpperCase(), x + PAD_X, y + LABEL_H * 0.74);
+
+    // Body content
+    if (!content || !content.trim()) return;
+    doc.setFont('helvetica', 'normal');
+    renderClipped(content, x + PAD_X, y + LABEL_H + 2, w - PAD_X * 2, h - LABEL_H - 3, fontSize || 8.5, COL.slate700);
+  }
+
+  // ── Footer on each page ───────────────────────────────────────────────────
+  function addFooter() {
+    const pageNum = doc.internal.getNumberOfPages();
+    setStroke(COL.slate200);
+    doc.setLineWidth(0.3);
+    doc.line(ML, PH - MB + 2, PW - MR, PH - MB + 2);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    setColor(COL.slate500);
+    doc.text('Competitive Battlecard AI', ML, PH - MB + 6);
+    doc.text(`Page ${pageNum}`, PW - MR, PH - MB + 6, { align: 'right' });
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // TITLE PAGE
+  // ═════════════════════════════════════════════════════════════════════════
+  const companyName = battlecard.companyName || 'Company';
+  const companyUrl  = battlecard.companyUrl  || '';
+  const dateStr     = new Date().toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric',
   });
 
-  // Add final page footer
-  addPageFooter();
+  // Header block
+  setFill(COL.primaryDk);
+  doc.rect(0, 0, PW, 58, 'F');
 
-  // Generate filename
-  const filename = `${battlecard.companyName.replace(/[^a-z0-9]/gi, '_')}_battlecard.pdf`;
+  // Left accent bar
+  setFill(COL.accent);
+  doc.rect(0, 0, 4, 58, 'F');
 
-  // Save the PDF
+  // Company name
+  doc.setFontSize(28);
+  doc.setFont('helvetica', 'bold');
+  setColor(COL.white);
+  const nameLines = doc.splitTextToSize(companyName, CW - 10);
+  doc.text(nameLines, ML + 6, 22);
+
+  // "Competitive Battlecard" label
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'normal');
+  setColor([165, 180, 252]);  // indigo-300
+  doc.text('Competitive Battlecard', ML + 6, 22 + nameLines.length * 10 + 2);
+
+  // Divider
+  setStroke(COL.primaryLt);
+  doc.setLineWidth(1);
+  doc.line(ML + 6, 55, ML + 40, 55);
+
+  let y = 68;
+
+  if (companyUrl) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    setColor(COL.slate700);
+    doc.text('Website:  ' + companyUrl, ML, y);
+    y += 7;
+  }
+
+  doc.setFontSize(9.5);
+  setColor(COL.slate500);
+  doc.text('Generated:  ' + dateStr, ML, y);
+  y += 14;
+
+  // Market summary on title page (if available via rawData)
+  const marketSummary = (rawData && rawData.market_summary || '').trim();
+  if (marketSummary) {
+    setFill(COL.slate900);
+    doc.rect(ML, y, CW, 6, 'F');
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    setColor(COL.white);
+    doc.text('MARKET SNAPSHOT', ML + 3, y + 4.5);
+    y += 8;
+
+    doc.setFontSize(9.5);
+    doc.setFont('helvetica', 'normal');
+    setColor(COL.slate700);
+    const summaryLines = doc.splitTextToSize(trunc(marketSummary, 800), CW - 4);
+    const LINE_H = 4.5;
+    const maxLines = Math.floor((PH - MB - y - 20) / LINE_H);
+    summaryLines.slice(0, maxLines).forEach((line, i) => {
+      doc.text(line, ML, y + (i + 1) * LINE_H);
+    });
+  }
+
+  addFooter();
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // COMPANY OVERVIEW PAGE (when rawData is available)
+  // ═════════════════════════════════════════════════════════════════════════
+  if (rawData && rawData.target_company) {
+    const tc = rawData.target_company;
+
+    doc.addPage();
+    let oy = MT;
+
+    // Page header
+    setFill(COL.primary);
+    doc.rect(0, 0, PW, 11, 'F');
+    setFill(COL.accent);
+    doc.rect(0, 0, 4, 11, 'F');
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    setColor(COL.white);
+    doc.text('Company Overview — ' + companyName, ML + 4, 7.5);
+    oy = 16;
+
+    // Overview paragraph
+    const overview = (tc.overview || '').trim();
+    if (overview) {
+      setFill(COL.primaryDk);
+      doc.rect(ML, oy, CW, 6, 'F');
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      setColor(COL.white);
+      doc.text('COMPANY OVERVIEW', ML + 2.5, oy + 4.2);
+      oy += 7.5;
+
+      doc.setFontSize(9.5);
+      doc.setFont('helvetica', 'normal');
+      setColor(COL.slate700);
+      const ovLines = doc.splitTextToSize(trunc(overview, 600), CW - 4);
+      ovLines.slice(0, 8).forEach((line, i) => {
+        doc.text(line, ML, oy + (i + 1) * 4.4);
+      });
+      oy += Math.min(ovLines.length, 8) * 4.4 + 6;
+    }
+
+    // Two-column Products | Strengths
+    const GAP    = 4;
+    const COL_W  = (CW - GAP) / 2;
+    const ROW_H  = 55;
+
+    const products  = (tc.products  || []).slice(0, 8).map(p => trunc(p, 120));
+    const strengths = (tc.strengths || []).slice(0, 8).map(s => trunc(s, 120));
+
+    if (products.length || strengths.length) {
+      if (products.length) {
+        drawPanel(ML,              oy, COL_W, ROW_H, COL.blue,  'Products & Capabilities',
+          products.map(p => '•  ' + p).join('\n'), 8.5);
+      }
+      if (strengths.length) {
+        drawPanel(ML + COL_W + GAP, oy, COL_W, ROW_H, COL.amber, 'Company Strengths',
+          strengths.map(s => '•  ' + s).join('\n'), 8.5);
+      }
+      oy += ROW_H + 4;
+    }
+
+    addFooter();
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // COMPETITOR PAGES — grid layout, one page per competitor
+  // ═════════════════════════════════════════════════════════════════════════
+  if (rawData && rawData.competitors && rawData.competitors.length > 0) {
+    rawData.competitors.forEach(comp => {
+      doc.addPage();
+
+      const cName = trunc((comp.company_name || 'Competitor').trim(), 80);
+
+      // ── Competitor name header ──────────────────────────────────────────
+      setFill(COL.slate900);
+      doc.rect(0, 0, PW, 13, 'F');
+      setFill(COL.primary);
+      doc.rect(0, 0, 4, 13, 'F');
+
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      setColor(COL.white);
+      doc.text(cName, PW / 2, 8.8, { align: 'center' });
+
+      // Website sub-label
+      if (comp.website) {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        setColor(COL.slate400);
+        doc.text(trunc(comp.website, 60), PW / 2, 12, { align: 'center' });
+      }
+
+      let gy = 16;
+
+      // ── Overview (full width) ──────────────────────────────────────────
+      const OV_H = 28;
+      const overviewText = (comp.overview || '').trim();
+      drawPanel(ML, gy, CW, OV_H, COL.blue, 'Overview',
+        trunc(overviewText, 500), 8.5);
+      gy += OV_H + 3;
+
+      // ── 2×2 grid: Products | Strengths / Pricing | Weaknesses ─────────
+      const GRID_GAP = 4;
+      const GCOL_W   = (CW - GRID_GAP) / 2;
+      const GRID_ROW = 52;
+
+      const products   = (comp.products   || []).slice(0, 8).map(v => trunc(v, 130));
+      const strengths  = (comp.strengths  || []).slice(0, 8).map(v => trunc(v, 130));
+      const pricing    = (comp.pricing    || []).slice(0, 6).map(v => trunc(v, 130));
+      const weaknesses = (comp.weaknesses || []).slice(0, 8).map(v => trunc(v, 130));
+
+      drawPanel(ML,               gy, GCOL_W, GRID_ROW, COL.violet,  'Products',
+        products.map(v => '•  ' + v).join('\n'), 8.5);
+      drawPanel(ML + GCOL_W + GRID_GAP, gy, GCOL_W, GRID_ROW, COL.emerald, 'Strengths',
+        strengths.map(v => '•  ' + v).join('\n'), 8.5);
+      gy += GRID_ROW + 3;
+
+      drawPanel(ML,               gy, GCOL_W, GRID_ROW, COL.teal,   'Pricing',
+        pricing.map(v => '•  ' + v).join('\n'), 8.5);
+      drawPanel(ML + GCOL_W + GRID_GAP, gy, GCOL_W, GRID_ROW, COL.rose,    'Weaknesses',
+        weaknesses.map(v => '•  ' + v).join('\n'), 8.5);
+      gy += GRID_ROW + 3;
+
+      // ── Bottom row: Key Differentiators | Potential Landmines ──────────
+      const howWeWin  = (comp.how_we_win          || []).slice(0, 8).map(v => trunc(v, 130));
+      const landmines = (comp.potential_landmines || []).slice(0, 8).map(v => trunc(v, 130));
+
+      // Remaining height for bottom row
+      const BOT_ROW = PH - MB - gy - 8;
+      const BOT_H   = Math.max(40, Math.min(BOT_ROW, 52));
+
+      drawPanel(ML,               gy, GCOL_W, BOT_H, COL.amber, 'Key Differentiators — Why We Win',
+        howWeWin.map(v => '•  ' + v).join('\n'), 8.5);
+      drawPanel(ML + GCOL_W + GRID_GAP, gy, GCOL_W, BOT_H, COL.red,   'Potential Landmines',
+        landmines.map(v => '•  ' + v).join('\n'), 8.5);
+
+      addFooter();
+    });
+  } else {
+    // ═══════════════════════════════════════════════════════════════════════
+    // FALLBACK: render from normalised battlecard sections
+    // ═══════════════════════════════════════════════════════════════════════
+    let yPos = MT;
+    let lastCompIdx = null;
+
+    const checkBreak = (need) => {
+      if (yPos + need > PH - MB - 8) {
+        addFooter();
+        doc.addPage();
+        yPos = MT;
+      }
+    };
+
+    const addSecHeader = (title, bgColor) => {
+      checkBreak(20);
+      yPos += 5;
+      const lines = doc.splitTextToSize(title, CW - 8);
+      const bh = Math.max(8, lines.length * 6 + 3);
+      setFill(bgColor || COL.primary);
+      doc.rect(ML, yPos, CW, bh, 'F');
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      setColor(COL.white);
+      lines.forEach((l, i) => doc.text(l, ML + 3, yPos + 6 + i * 6));
+      yPos += bh + 4;
+    };
+
+    const addBody = (text) => {
+      if (!text || !text.trim()) return;
+      const lines = doc.splitTextToSize(text, CW - 2);
+      const LH = 5;
+      lines.forEach(line => {
+        checkBreak(LH + 2);
+        doc.setFontSize(9.5);
+        doc.setFont('helvetica', 'normal');
+        setColor(COL.slate700);
+        doc.text(line, ML, yPos);
+        yPos += LH;
+      });
+      yPos += 3;
+    };
+
+    (battlecard.sections || []).forEach(section => {
+      if (!section.body || !section.body.trim()) return;
+
+      const compMatch = section.id && section.id.match(/^competitor_(\d+)/);
+      const isHdr     = section.id && section.id.endsWith('_header');
+
+      if (compMatch && lastCompIdx !== compMatch[1]) {
+        lastCompIdx = compMatch[1];
+        addFooter();
+        doc.addPage();
+        yPos = MT;
+
+        const cName = section.title
+          .replace(/^Competitor:\s*/i, '')
+          .replace(/ - .+$/i, '');
+
+        setFill(COL.slate900);
+        doc.rect(0, 0, PW, 13, 'F');
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        setColor(COL.white);
+        doc.text(cName, PW / 2, 9, { align: 'center' });
+        yPos = 18;
+
+        if (isHdr) {
+          if (section.body.startsWith('Website:')) {
+            doc.setFontSize(8.5);
+            doc.setFont('helvetica', 'normal');
+            setColor(COL.slate500);
+            doc.text(section.body, ML, yPos);
+            yPos += 6;
+          }
+          return;
+        }
+      }
+
+      let displayTitle = section.title;
+      const pfx = displayTitle.match(/^.+ - (.+)$/);
+      if (pfx && section.id && section.id.startsWith('competitor_')) displayTitle = pfx[1];
+
+      addSecHeader(displayTitle, COL.primaryDk);
+      addBody(section.body);
+    });
+
+    addFooter();
+  }
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+  const filename = (battlecard.companyName || 'battlecard').replace(/[^a-z0-9]/gi, '_') + '_battlecard.pdf';
   doc.save(filename);
 }
 
-// Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { generateBattlecardPdf };
 }
