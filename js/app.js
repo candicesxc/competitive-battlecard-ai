@@ -1545,7 +1545,7 @@ const handlePdfDownload = () => {
   }
 
   try {
-    generateBattlecardPdf(currentBattlecard);
+    generateBattlecardPdf(currentBattlecard, currentBattlecardRawData);
   } catch (error) {
     console.error("Error generating PDF:", error);
     showError("Failed to generate PDF. Please try again.");
