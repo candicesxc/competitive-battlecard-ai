@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import List, Literal, Optional, TypedDict
 
 CompetitorType = Literal["direct", "adjacent", "aspirational", "irrelevant"]
+CompetitionMode = Literal["direct_product", "platform_feature", "managed_service", "open_source", "irrelevant"]
 
 
 class CompanyProfile(TypedDict, total=False):
@@ -45,7 +46,8 @@ class ScoredCompetitor(TypedDict, total=False):
     business_model_similarity: float
     similarity_score: float
     competitor_type: CompetitorType
+    competition_mode: CompetitionMode
     reason_for_similarity: str
 
 
-__all__ = ["CompanyProfile", "CompetitorStub", "ScoredCompetitor", "CompetitorType"]
+__all__ = ["CompanyProfile", "CompetitorStub", "ScoredCompetitor", "CompetitorType", "CompetitionMode"]

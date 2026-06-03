@@ -39,12 +39,39 @@ Your job is to compare each competitor to the target and evaluate:
 
 2. product_similarity (0 to 100):
    THIS IS THE MOST IMPORTANT DIMENSION.
-   - 100 if they sell essentially the same core product or solve the identical problem
-     for the same type of buyer (e.g., both are endpoint management platforms, both are
-     earned-wage-access apps, both are no-code form builders, etc.).
-   - 50 if they overlap significantly but are not the same product category.
-   - 0-30 if they are in a completely different product category — even if they share
-     an industry or target audience.
+   Score it high for ANY of the following four competition modes — all are real
+   and common in B2B software:
+
+   MODE A — Direct product competition (score 80-100):
+     Both companies sell essentially the same standalone product to the same buyer.
+     Example: Snyk vs Checkmarx (both are developer security / SCA / SAST tools).
+
+   MODE B — Feature / platform competition (score 65-85):
+     A large platform company ships the SAME CAPABILITY as a built-in feature.
+     The customer must choose: buy the specialist tool OR use the platform's built-in.
+     Example: GitHub Advanced Security / GitLab Security Scanning competes with Snyk,
+     even though GitHub's primary product is code hosting.
+     Example: AWS Inspector competes with vulnerability-scanning vendors.
+     Score this mode high; do NOT penalise it just because the competitor's primary
+     label is "DevOps platform" or "cloud provider".
+
+   MODE C — Managed-service / cloud-native competition (score 65-85):
+     A cloud hyperscaler (AWS, Azure, GCP) offers the same technology as a fully
+     managed cloud service, displacing the specialist vendor.
+     Example: AWS RDS for PostgreSQL / Amazon Aurora competes with EnterpriseDB,
+     even though AWS's primary label is "cloud infrastructure".
+     Example: Azure Database for PostgreSQL competes with EDB.
+     Score this mode high; do NOT penalise because the competitor is "too broad".
+
+   MODE D — Open-source / community competition (score 55-75):
+     The free, community version of the same technology that buyers can self-host
+     instead of paying the target.
+     Example: Community PostgreSQL competes with EnterpriseDB.
+     Example: OpenSearch competes with Elasticsearch/Elastic.
+
+   Score LOW (0-40) ONLY if the products solve fundamentally different problems for
+   different buyers — e.g., an endpoint-security vendor vs. an application-security
+   vendor are low similarity even though both are "security".
 
 3. audience_similarity (0 to 100):
    - 100 if they target the same customer segment.
@@ -52,33 +79,34 @@ Your job is to compare each competitor to the target and evaluate:
 
 4. size_similarity (0 to 100):
    - 100 if the competitor is the same size OR larger than the target (a larger company
-     that sells the same product is always a meaningful competitor the target must defend against).
+     that sells the same product or capability is always a meaningful competitor the
+     target must defend against — e.g., Oracle competing with a smaller PostgreSQL vendor).
    - 70-90 if one tier smaller (e.g., target is enterprise, competitor is midmarket).
    - 30-60 if much smaller (tiny startup vs. established enterprise).
-   - Prefer companies that are at least as large as the target.
+   - NEVER mark a large well-known company "irrelevant" purely because it is bigger.
 
 5. business_model_similarity (0 to 100):
    - 100 if they use the same business model (for example both B2B SaaS).
    - Lower otherwise.
 
 Then compute an overall similarity_score (0 to 100) that reflects how directly this
-company competes with the target. Weight product_similarity the most heavily — two
-companies that sell the same core product to the same buyer are strong competitors even
-if they differ in size or business model details.
+company competes with the target. Weight product_similarity the most heavily.
 
 Also assign competitor_type:
-- "direct" if product, industry, and audience are strongly similar.
-- "adjacent" if they operate nearby in the market or serve a similar audience with a different product.
-- "aspirational" if much larger but in essentially the same space.
+- "direct" if product, industry, and audience are strongly similar (modes A or B/C with
+  high product_similarity).
+- "adjacent" if they operate nearby in the market or serve a similar audience with a
+  partially overlapping product.
+- "aspirational" if much larger and in the same space but the target rarely wins deals
+  against them directly.
 - "irrelevant" if they are not a meaningful competitor.
 
 AUTOMATIC "irrelevant" CASES — mark these as irrelevant immediately without scoring:
-- Software review / comparison platforms (G2, Capterra, TrustRadius, PeerSpot, GetApp, SoftwareAdvice, etc.)
-- Market research and analyst firms (Gartner, Forrester, IDC, CB Insights, PitchBook, etc.)
-- News outlets, blogs, or media companies (TechCrunch, VentureBeat, InfoQ, etc.)
+- Software review / comparison platforms (G2, Capterra, TrustRadius, PeerSpot, GetApp, SoftwareAdvice, Comparably, etc.)
+- Market research and analyst firms (Gartner, Forrester, IDC, CB Insights, PitchBook, McKinsey, Deloitte, etc.)
+- News outlets, blogs, or media companies (TechCrunch, VentureBeat, SecurityWeek, Dark Reading, etc.)
 - Social networks, job boards, or directory sites (LinkedIn, Glassdoor, Indeed, Crunchbase, etc.)
-- Any company whose primary business is reviewing, ranking, or analysing other companies —
-  they do not sell a competing product to the same buyers.
+- Any company whose primary business is reviewing, ranking, or analysing other companies.
 
 For each competitor, return a JSON object with:
 {
@@ -91,27 +119,24 @@ For each competitor, return a JSON object with:
   "business_model_similarity": <0-100>,
   "similarity_score": <0-100>,
   "competitor_type": "direct" | "adjacent" | "aspirational" | "irrelevant",
-  "reason_for_similarity": "1 to 3 sentences explaining why this company is or is not a strong competitor."
+  "competition_mode": "direct_product" | "platform_feature" | "managed_service" | "open_source" | "irrelevant",
+  "reason_for_similarity": "1 to 3 sentences explaining why this company is or is not a strong competitor, and which competition mode applies."
 }
 
 Rules:
-- The core product sold must be similar. Sharing an industry or customer type is not
-  enough — if one company sells endpoint security software and the other sells market
-  research reports, they are irrelevant to each other.
-- Only mark a company as "direct" if the product and target audience are clearly similar.
-- Prefer companies that sell similar products, to similar customers, in the same industry and size band.
+- Use all four competition modes (A/B/C/D) to determine product_similarity; do not
+  default to "different category" just because the competitor is a large platform or
+  cloud provider.
+- Only mark a company as "direct" if the product_similarity is clearly high (≥ 65).
 - If in doubt, lower the similarity_score instead of inflating it.
-- HARD FILTER — assign competitor_type "irrelevant" if ANY of these is true:
+- HARD FILTER — assign competitor_type "irrelevant" if EITHER of these is true:
     (a) industry_similarity < 40  (clearly different market vertical)
-    (b) product_similarity < 55   (different core product category — the products must be
-        meaningfully similar, not just in the same broad domain)
-    (c) size_similarity < 25 AND competitor_type would otherwise be "direct" (a company
-        that is far too small to be a real competitive threat is not a direct competitor)
-  Off-industry or off-product candidates that share only a company name or generic
-  keywords with the target must be marked "irrelevant" regardless of other scores.
-- SIZE PREFERENCE — When ranking, prefer competitors that are at least as large as the
-  target company. A well-known larger player in the same space is always a more relevant
-  competitor than a small startup with a similar product.
+    (b) product_similarity < 50   (does not compete on any of the four modes above)
+  Exception: for MODE C (cloud hyperscaler managed service) and MODE B (platform feature),
+  industry_similarity may be lower because the competitor is broader — in these cases,
+  use product_similarity ≥ 60 as the deciding factor, not industry_similarity.
+- SIZE PREFERENCE — prefer competitors that are at least as large as the target; a
+  well-known larger player in the same space is more relevant than a tiny startup.
 
 Return a single JSON array of these objects, with no extra text or markdown."""
 
@@ -221,20 +246,34 @@ Return a JSON array of scored competitors matching the format described above.""
             if competitor_type not in ["direct", "adjacent", "aspirational", "irrelevant"]:
                 competitor_type = "adjacent"
 
+            competition_mode = entry.get("competition_mode", "direct_product")
+            if competition_mode not in ["direct_product", "platform_feature", "managed_service", "open_source", "irrelevant"]:
+                competition_mode = "direct_product"
+
             industry_sim = _safe_float(entry.get("industry_similarity"), 0.0)
             product_sim = _safe_float(entry.get("product_similarity"), 0.0)
             comp_name = entry.get("name", "").strip()
 
-            # Enforce the hard filter in code — the LLM may return a non-"irrelevant"
-            # type even when scores are clearly too low.
-            # product_similarity threshold: the core product sold must match.
-            if industry_sim < 40 or product_sim < 55:
-                competitor_type = "irrelevant"
+            # Enforce hard filter in code — the LLM may return a non-"irrelevant" type
+            # even when scores are clearly too low.
+            #
+            # For Mode B (platform_feature) and Mode C (managed_service), the competitor
+            # is intentionally broader than the target so industry_similarity is naturally
+            # lower. In those cases we rely on product_similarity alone (≥ 60) rather
+            # than requiring both dimensions to be high.
+            is_broad_mode = competition_mode in ("platform_feature", "managed_service")
+            if is_broad_mode:
+                if product_sim < 60:
+                    competitor_type = "irrelevant"
+            else:
+                if industry_sim < 40 or product_sim < 50:
+                    competitor_type = "irrelevant"
 
             # Name-based blocklist: review platforms, analyst firms, media outlets, etc.
             # are never real competitors regardless of what the LLM returns.
             if _is_non_competitor_name(comp_name):
                 competitor_type = "irrelevant"
+                competition_mode = "irrelevant"
 
             scored_comp: ScoredCompetitor = {
                 "name": entry.get("name", "").strip(),
@@ -246,6 +285,7 @@ Return a JSON array of scored competitors matching the format described above.""
                 "business_model_similarity": _safe_float(entry.get("business_model_similarity"), 0.0),
                 "similarity_score": _safe_float(entry.get("similarity_score"), 0.0),
                 "competitor_type": competitor_type,
+                "competition_mode": competition_mode,
                 "reason_for_similarity": entry.get("reason_for_similarity", "").strip() or "Competitor identified via web search.",
             }
 

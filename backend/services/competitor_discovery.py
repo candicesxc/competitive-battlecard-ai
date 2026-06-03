@@ -181,17 +181,21 @@ Web Search Excerpts:
 Please analyze these excerpts and identify competitor companies.
 
 CRITICAL VALIDATION RULES:
-1. Only include a company if it genuinely operates in the same market as the target
-   ({category_str}) and sells a similar core product to the same type of customer
-   ({target_audience or "same audience"}).
+1. Include a company if it competes in ANY of these four ways:
+   a) Sells essentially the same standalone product to the same buyer (direct competition).
+   b) Is a large platform that ships the same CAPABILITY as a built-in feature — e.g.
+      GitHub / GitLab compete with developer security tools by bundling security scanning.
+   c) Is a cloud provider (AWS, Azure, GCP, etc.) that offers the same technology as a
+      managed service — e.g. AWS RDS/Aurora competes with enterprise PostgreSQL vendors.
+   d) Is the free open-source version of the same technology the target commercialises.
 2. NEVER include software review or comparison platforms (G2, Capterra, TrustRadius,
-   PeerSpot, GetApp, SoftwareAdvice, etc.) — they don't sell a competing product.
-3. NEVER include market research / analyst firms (Gartner, Forrester, IDC, CB Insights,
-   PitchBook, etc.) — they publish reports, they are not product competitors.
+   PeerSpot, Comparably, etc.) — they don't sell a competing product.
+3. NEVER include market research / analyst firms (Gartner, Forrester, IDC, McKinsey,
+   Deloitte, etc.) — they publish reports, they are not product competitors.
 4. NEVER include news sites, media outlets, job boards, or directory sites as competitors.
 5. Many web pages mention unrelated companies — DO NOT include them just because they
-   appear near the target's name. Sharing an industry or a customer type is not enough;
-   the core product must be similar.
+   appear near the target's name. Sharing only an industry or customer type is not enough;
+   the company must displace the target in a buying decision.
 
 For each qualifying competitor found:
 1. Extract the company name
