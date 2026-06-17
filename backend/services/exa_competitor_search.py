@@ -26,8 +26,11 @@ def _should_skip_domain(domain: str, target_domain: Optional[str]) -> bool:
     if not domain:
         return True
     domain = domain.lower()
-    if target_domain and domain == target_domain.lower():
-        return True
+    if target_domain:
+        t = target_domain.lower()
+        # Catch exact match AND any subdomain of the target (e.g. app.ramp.com)
+        if domain == t or domain.endswith("." + t):
+            return True
     return any(keyword in domain for keyword in _SKIP_DOMAIN_KEYWORDS)
 
 
