@@ -27,8 +27,11 @@ def _should_skip_domain(domain: str, target_domain: str | None) -> bool:
     if not domain:
         return True
     domain = domain.lower()
-    if target_domain and domain == target_domain.lower():
-        return True
+    if target_domain:
+        t = target_domain.lower()
+        # Catch exact match AND any subdomain of the target (e.g. app.ramp.com)
+        if domain == t or domain.endswith("." + t):
+            return True
     return any(keyword in domain for keyword in _SKIP_DOMAIN_KEYWORDS)
 
 
@@ -334,6 +337,7 @@ async def discover_competitors_via_search(
     5) Optionally drop stubs with very low evidence.
     """
     target_domain = extract_domain(target_profile.get("website", ""))
+    target_name_normalized = _normalize_name(target_profile.get("name", ""))
 
     # Step 1: Collect snippets
     snippets = await _collect_search_snippets_for_company(target_profile)
@@ -377,12 +381,12 @@ async def discover_competitors_via_search(
         if domain and domain.lower() in seen_domains:
             continue
 
-        # Skip if domain matches skip list
+        # Skip if domain matches skip list (also catches subdomains of target)
         if domain and _should_skip_domain(domain, target_domain):
             continue
 
-        # Skip if target domain matches
-        if domain and target_domain and domain.lower() == target_domain.lower():
+        # Skip if the competitor name matches the target company name
+        if target_name_normalized and normalized_name == target_name_normalized:
             continue
 
         # Skip review platforms, analyst firms, and media outlets by name

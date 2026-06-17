@@ -191,8 +191,9 @@ def parse_competitor_candidates(
     def _is_target_domain(url: Optional[str]) -> bool:
         if not url or not target_domain:
             return False
-        parsed = urlparse(url)
-        return parsed.netloc == target_domain
+        netloc = urlparse(url).netloc.lower().replace("www.", "")
+        t = target_domain.lower().replace("www.", "")
+        return netloc == t or netloc.endswith("." + t)
 
     # First, leverage knowledge graph "people also search for"
     for related in knowledge_graph.get("peopleAlsoSearchFor", []):

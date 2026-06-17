@@ -102,11 +102,17 @@ Also assign competitor_type:
 - "irrelevant" if they are not a meaningful competitor.
 
 AUTOMATIC "irrelevant" CASES — mark these as irrelevant immediately without scoring:
+- The target company itself — if a candidate's name matches the target company name, it is
+  not a competitor of itself; mark it irrelevant immediately.
 - Software review / comparison platforms (G2, Capterra, TrustRadius, PeerSpot, GetApp, SoftwareAdvice, Comparably, etc.)
 - Market research and analyst firms (Gartner, Forrester, IDC, CB Insights, PitchBook, McKinsey, Deloitte, etc.)
 - News outlets, blogs, or media companies (TechCrunch, VentureBeat, SecurityWeek, Dark Reading, etc.)
 - Social networks, job boards, or directory sites (LinkedIn, Glassdoor, Indeed, Crunchbase, etc.)
 - Any company whose primary business is reviewing, ranking, or analysing other companies.
+- Obscure micro-startups with no established market presence or brand recognition: if you
+  have never encountered the company name in the context of this market, or you cannot
+  confirm it is a real, funded, operating business, assign similarity_score < 30 and mark
+  it "irrelevant". Do not guess or assume legitimacy.
 
 For each competitor, return a JSON object with:
 {
@@ -155,6 +161,12 @@ async def score_competitors(
     """
     if not competitors:
         return []
+
+    # Normalised target name used to hard-block the target company from scoring itself
+    _target_name_norm = (
+        target_profile.get("name", "").lower()
+        .strip().replace(" ", "").replace(".", "").replace("-", "")
+    )
 
     # Fetch page text for each competitor in parallel
     async def _fetch_competitor_data(competitor):
@@ -272,6 +284,14 @@ Return a JSON array of scored competitors matching the format described above.""
             # Name-based blocklist: review platforms, analyst firms, media outlets, etc.
             # are never real competitors regardless of what the LLM returns.
             if _is_non_competitor_name(comp_name):
+                competitor_type = "irrelevant"
+                competition_mode = "irrelevant"
+
+            # Hard-block the target company from appearing as its own competitor.
+            comp_name_norm = (
+                comp_name.lower().replace(" ", "").replace(".", "").replace("-", "")
+            )
+            if _target_name_norm and comp_name_norm == _target_name_norm:
                 competitor_type = "irrelevant"
                 competition_mode = "irrelevant"
 
