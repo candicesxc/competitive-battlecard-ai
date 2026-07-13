@@ -166,6 +166,34 @@ SKIP_DOMAIN_KEYWORDS: tuple[str, ...] = (
     "aitoptools.com",
     "topai.tools",
     "aitoolhunt.com",
+    # ── Sales/compensation review sites ──────────────────────────────────────
+    "repvue.com",               # Sales rep salary / employer review site
+    "levels.fyi",               # Already present but reaffirmed here
+    "payscale.com",
+    "salary.com",
+    "glassdoor.com",
+    # ── Product/startup directories ───────────────────────────────────────────
+    "productmint.com",          # Product comparison / startup directory
+    "slant.co",
+    "saashub.com",
+    "getlatka.com",             # SaaS metrics directory
+    "saasmag.com",
+    "saaslist.com",
+    # ── VC / investor / accelerator sites ────────────────────────────────────
+    "a16z.com",
+    "sequoiacap.com",
+    "ycombinator.com",
+    "techstars.com",
+    "500.co",
+    "firstround.com",
+    "generalcatalyst.com",
+    "accel.com",
+    "greylock.com",
+    "bessemervp.com",
+    "nea.com",
+    "indexventures.com",
+    "lightspeedvp.com",
+    "andreessenhorowitz.com",
 )
 
 # ---------------------------------------------------------------------------
@@ -175,6 +203,24 @@ SKIP_DOMAIN_KEYWORDS: tuple[str, ...] = (
 # Keep fragments specific enough to avoid false-positives on real company
 # names (e.g. avoid single common words like "wired" or "clutch").
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Name suffix / type patterns that indicate a non-product company
+# (VC firms, accelerators, law firms, etc.)
+# Checked as substrings of the NORMALISED name (lower, no spaces/dots/dashes).
+# ---------------------------------------------------------------------------
+NON_COMPETITOR_TYPE_FRAGMENTS: tuple[str, ...] = (
+    "ventureCapital",   # placeholder — see normalised forms below
+    # Normalised (lowercase, no spaces) forms:
+    "venturecapital",
+    "vcfund",
+    "vcfirm",
+    "angelinvestor",
+    "privateequity",
+    "accelerator",
+    "incubator",
+    "valueaddvc",       # "Value Add VC" exactly
+)
+
 NON_COMPETITOR_NAME_FRAGMENTS: tuple[str, ...] = (
     # Review / comparison platforms
     "g2crowd",
@@ -268,4 +314,23 @@ NON_COMPETITOR_NAME_FRAGMENTS: tuple[str, ...] = (
     "globenewswire",
     "openpr",
     "prweb",
+    # Sales/compensation review sites
+    "repvue",
+    "payscale",
+    "salary",
+    # Product/startup directories
+    "productmint",
+    "saashub",
+    "getlatka",
+    "saasmag",
+    "saaslist",
+    "slant",
+    # VC / investor firms
+    "andreessenhorowitz",
+    "sequoiacap",
+    "generalcatalyst",
+    "firstround",
+    "lightspeedvp",
+    "bessemervp",
+    "indexventures",
 )

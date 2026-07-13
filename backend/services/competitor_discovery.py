@@ -10,6 +10,7 @@ from ..models.company_profile import CompanyProfile, CompetitorStub
 from .analysis_service import AnalysisError, _json_completion
 from .exa_client import cached_search_and_contents
 from .blacklist import NON_COMPETITOR_NAME_FRAGMENTS as _NON_COMPETITOR_NAME_FRAGMENTS
+from .blacklist import NON_COMPETITOR_TYPE_FRAGMENTS as _NON_COMPETITOR_TYPE_FRAGMENTS
 from .blacklist import SKIP_DOMAIN_KEYWORDS as _SKIP_DOMAIN_KEYWORDS
 from .search_service import extract_domain
 
@@ -17,9 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 def _is_non_competitor_name(name: str) -> bool:
-    """Return True if the company name matches a known non-competitor platform."""
+    """Return True if the company name matches a known non-competitor platform or investor firm."""
     normalized = name.lower().strip().replace(" ", "").replace(".", "").replace("-", "")
-    return any(frag in normalized for frag in _NON_COMPETITOR_NAME_FRAGMENTS)
+    return (
+        any(frag in normalized for frag in _NON_COMPETITOR_NAME_FRAGMENTS)
+        or any(frag in normalized for frag in _NON_COMPETITOR_TYPE_FRAGMENTS)
+    )
 
 
 def _should_skip_domain(domain: str, target_domain: str | None) -> bool:

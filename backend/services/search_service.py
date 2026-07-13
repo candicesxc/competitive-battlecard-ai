@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 from .blacklist import SKIP_DOMAIN_KEYWORDS as _SKIP_DOMAINS
 from .blacklist import NON_COMPETITOR_NAME_FRAGMENTS as _NON_COMPETITOR_NAMES
+from .blacklist import NON_COMPETITOR_TYPE_FRAGMENTS as _NON_COMPETITOR_TYPES
 from .exa_client import cached_search_and_contents
 
 logger = logging.getLogger(__name__)
@@ -163,6 +164,8 @@ def _is_blacklisted_candidate(name: Optional[str], url: Optional[str]) -> bool:
     if name:
         normalized = name.lower().strip().replace(" ", "").replace(".", "").replace("-", "").replace(",", "")
         if any(frag in normalized for frag in _NON_COMPETITOR_NAMES):
+            return True
+        if any(frag in normalized for frag in _NON_COMPETITOR_TYPES):
             return True
     return False
 

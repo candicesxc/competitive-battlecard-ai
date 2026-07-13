@@ -8,6 +8,7 @@ from typing import List
 from ..models.company_profile import CompanyProfile, CompetitorStub, ScoredCompetitor
 from .analysis_service import AnalysisError, _json_completion
 from .blacklist import NON_COMPETITOR_NAME_FRAGMENTS as _NON_COMPETITOR_NAME_FRAGMENTS
+from .blacklist import NON_COMPETITOR_TYPE_FRAGMENTS as _NON_COMPETITOR_TYPE_FRAGMENTS
 from .competitor_pipeline import fetch_page_text
 
 logger = logging.getLogger(__name__)
@@ -16,9 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 def _is_non_competitor_name(name: str) -> bool:
-    """Return True if the company name matches a known non-competitor (review/analyst) platform."""
+    """Return True if the company name matches a known non-competitor (review/analyst/VC) platform."""
     normalized = name.lower().strip().replace(" ", "").replace(".", "").replace("-", "")
-    return any(frag in normalized for frag in _NON_COMPETITOR_NAME_FRAGMENTS)
+    return (
+        any(frag in normalized for frag in _NON_COMPETITOR_NAME_FRAGMENTS)
+        or any(frag in normalized for frag in _NON_COMPETITOR_TYPE_FRAGMENTS)
+    )
 
 
 COMPETITOR_SCORING_PROMPT = """You are a senior competitive intelligence analyst.
@@ -104,15 +108,19 @@ Also assign competitor_type:
 AUTOMATIC "irrelevant" CASES — mark these as irrelevant immediately without scoring:
 - The target company itself — if a candidate's name matches the target company name, it is
   not a competitor of itself; mark it irrelevant immediately.
-- Software review / comparison platforms (G2, Capterra, TrustRadius, PeerSpot, GetApp, SoftwareAdvice, Comparably, etc.)
+- Software review / comparison platforms (G2, Capterra, TrustRadius, PeerSpot, GetApp, SoftwareAdvice, Comparably, RepVue, etc.)
 - Market research and analyst firms (Gartner, Forrester, IDC, CB Insights, PitchBook, McKinsey, Deloitte, etc.)
 - News outlets, blogs, or media companies (TechCrunch, VentureBeat, SecurityWeek, Dark Reading, etc.)
 - Social networks, job boards, or directory sites (LinkedIn, Glassdoor, Indeed, Crunchbase, etc.)
-- Any company whose primary business is reviewing, ranking, or analysing other companies.
-- Obscure micro-startups with no established market presence or brand recognition: if you
-  have never encountered the company name in the context of this market, or you cannot
-  confirm it is a real, funded, operating business, assign similarity_score < 30 and mark
-  it "irrelevant". Do not guess or assume legitimacy.
+- Venture capital / private equity / accelerator firms (a16z, Sequoia, Y Combinator, General Catalyst,
+  "Value Add VC", or any entity whose name or description indicates it is an investor, not a product company).
+- Product / SaaS directories and aggregators (ProductHunt, SaaSHub, GetLatka, Productmint, etc.)
+- Any company whose primary business is reviewing, ranking, analysing, or investing in other companies.
+- Obscure or unrecognisable companies: if the candidate name is completely unknown to you in the
+  context of this market (you cannot confidently name their product, their customers, or confirm
+  they are a funded, operating business with real market presence), assign similarity_score < 25
+  and mark it "irrelevant". This applies to names like "Seeto", "Distill", "Value Add VC",
+  "Precoro" (when analysing a spend-management target), etc. Do NOT invent or assume legitimacy.
 
 For each competitor, return a JSON object with:
 {
