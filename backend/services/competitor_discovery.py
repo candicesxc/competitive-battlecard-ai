@@ -94,10 +94,26 @@ async def _collect_search_snippets_for_company(
     if core_products:
         queries.append(f"{core_products[0]} alternative")
 
+    # --- Sub-industry synonym query: catches markets where a specific product label is
+    #     more searchable than the sub_industry string itself.
+    #     e.g. "spend management" and "corporate card" are synonyms; surfacing both
+    #     ensures articles that use either term are included.
+    _SUBINDUSTRY_SYNONYMS: Dict[str, List[str]] = {
+        "spend management": ["corporate card spend management competitors", "best expense management corporate card software"],
+        "corporate card": ["corporate card spend management competitors", "best expense management software companies"],
+        "expense management": ["best corporate card expense management platforms", "spend management software alternatives"],
+        "accounts payable": ["best accounts payable automation software", "AP automation alternatives"],
+        "earned wage access": ["best earned wage access platforms", "on-demand pay software alternatives"],
+    }
+    for keyword, extra_queries in _SUBINDUSTRY_SYNONYMS.items():
+        if keyword in sub_industry.lower() or keyword in industry.lower():
+            queries.extend(extra_queries)
+            break
+
     # Execute searches sequentially to respect rate limiting
     # The rate limiter will ensure proper spacing between calls
     search_results_list = []
-    for query in queries[:5]:  # Allow up to 5 queries for better coverage
+    for query in queries[:6]:  # Allow up to 6 queries for better coverage
         try:
             result = await cached_search_and_contents(
                 query,
@@ -110,7 +126,7 @@ async def _collect_search_snippets_for_company(
             search_results_list.append(exc)
 
     try:
-        for query, results in zip(queries[:5], search_results_list):
+        for query, results in zip(queries[:6], search_results_list):
             if isinstance(results, Exception):
                 logger.warning("Exa search failed for '%s': %s", query, results)
                 continue

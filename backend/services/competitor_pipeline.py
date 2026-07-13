@@ -49,7 +49,9 @@ Use these rules:
       "network security", "SIEM / threat detection", "vulnerability management"
     * Data: "data observability", "data pipeline / ETL", "business intelligence", "data governance"
     * HR: "payroll software", "workforce management", "employee engagement", "ATS / recruiting"
-    * Fintech: "earned wage access", "spend management", "accounts payable automation", "lending"
+    * Fintech: "corporate card / spend management", "accounts payable (AP) automation",
+      "expense management", "earned wage access", "payroll fintech", "B2B payments",
+      "procurement software", "treasury management", "lending / credit"
   Do NOT use broad labels like "cybersecurity", "software", "SaaS", or "technology" as sub_industry.
 - Infer company_size roughly (startup, midmarket, enterprise) based on language, customer logos, and tone.
 - Infer business_model (B2B SaaS, B2C, marketplace, hardware, services, other).

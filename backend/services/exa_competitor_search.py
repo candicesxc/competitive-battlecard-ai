@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import List, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict
 from urllib.parse import urlparse
 
 import httpx
@@ -165,6 +165,21 @@ async def find_competitor_candidates_with_exa(
     # --- Product-level query ---
     if core_products and len(core_products) > 0:
         queries.append(f"{core_products[0]} competitors")
+
+    # --- Sub-industry synonym queries: markets with multiple common labels need
+    #     queries using both terms (e.g. "spend management" AND "corporate card")
+    #     so that articles using either label are captured.
+    _SUBINDUSTRY_SYNONYMS = {
+        "spend management": ["corporate card spend management competitors", "best expense management corporate card software"],
+        "corporate card": ["corporate card spend management competitors", "best expense management software companies"],
+        "expense management": ["best corporate card expense management platforms", "spend management software alternatives"],
+        "accounts payable": ["best accounts payable automation software", "AP automation alternatives"],
+        "earned wage access": ["best earned wage access platforms", "on-demand pay software alternatives"],
+    }
+    for keyword, extra_queries in _SUBINDUSTRY_SYNONYMS.items():
+        if keyword in sub_industry.lower() or keyword in industry.lower():
+            queries.extend(extra_queries)
+            break
 
     # Step 3: Execute keyword searches
     # Use sequential calls instead of gather to respect rate limiting

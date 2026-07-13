@@ -45,6 +45,10 @@ Your job is to compare each competitor to the target and evaluate:
    MODE A — Direct product competition (score 80-100):
      Both companies sell essentially the same standalone product to the same buyer.
      Example: Snyk vs Checkmarx (both are developer security / SCA / SAST tools).
+     Example: Ramp vs Brex, BILL Spend & Expense, Expensify, Rippling Spend, Airbase
+       (all are corporate card / spend management / expense management platforms for businesses).
+     Example: Divvy vs Expensify (both offer corporate cards with expense reporting).
+     The key test: would a buyer evaluating the target also seriously evaluate this competitor?
 
    MODE B — Feature / platform competition (score 65-85):
      A large platform company ships the SAME CAPABILITY as a built-in feature.
@@ -72,6 +76,12 @@ Your job is to compare each competitor to the target and evaluate:
    Score LOW (0-40) ONLY if the products solve fundamentally different problems for
    different buyers — e.g., an endpoint-security vendor vs. an application-security
    vendor are low similarity even though both are "security".
+   Fintech examples of LOW similarity (do NOT score these high against each other):
+   - A consumer personal finance app vs. a B2B corporate card platform.
+   - A mortgage lender vs. a spend management tool.
+   - A crypto exchange vs. an expense reporting SaaS.
+   - A general ERP (SAP, Oracle NetSuite) vs. a spend management tool — only mark as
+     competitor if the ERP's expense/card module directly displaces the target.
 
 3. audience_similarity (0 to 100):
    - 100 if they target the same customer segment.
