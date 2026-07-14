@@ -8,6 +8,8 @@ from urllib.parse import urlparse
 import httpx
 
 from ..models.company_profile import CompanyProfile
+from .blacklist import NON_COMPETITOR_NAME_FRAGMENTS as _NON_COMPETITOR_NAMES
+from .blacklist import NON_COMPETITOR_TYPE_FRAGMENTS as _NON_COMPETITOR_TYPES
 from .blacklist import SKIP_DOMAIN_KEYWORDS as _SKIP_DOMAIN_KEYWORDS
 from .exa_client import cached_find_similar_and_contents, cached_search_and_contents
 from .search_service import extract_domain
@@ -70,6 +72,15 @@ class CompetitorCandidate(TypedDict, total=False):
     raw_text: str  # page text from Exa, if available
 
 
+def _is_non_competitor_name(name: str) -> bool:
+    """Return True if the candidate name matches a known non-competitor pattern."""
+    normalized = name.lower().strip().replace(" ", "").replace(".", "").replace("-", "")
+    return (
+        any(frag in normalized for frag in _NON_COMPETITOR_NAMES)
+        or any(frag in normalized for frag in _NON_COMPETITOR_TYPES)
+    )
+
+
 def _normalize_domain(url: str) -> str:
     """Normalize a URL to a domain for deduplication."""
     parsed = urlparse(url)
@@ -110,6 +121,10 @@ async def find_competitor_candidates_with_exa(
             seen_domains.add(domain)
             text_content = result.text or ""
             title = result.title or domain.split(".")[0].replace("-", " ").title()
+
+            # Skip candidates whose name matches known non-competitor patterns
+            if _is_non_competitor_name(title):
+                continue
 
             candidates.append(
                 CompetitorCandidate(
@@ -200,6 +215,9 @@ async def find_competitor_candidates_with_exa(
                 seen_domains.add(domain)
                 text_content = result.text or ""
                 title = result.title or domain.split(".")[0].replace("-", " ").title()
+
+                if _is_non_competitor_name(title):
+                    continue
 
                 candidates.append(
                     CompetitorCandidate(

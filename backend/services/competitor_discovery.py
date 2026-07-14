@@ -188,7 +188,8 @@ Web Search Excerpts:
 Please analyze these excerpts and identify competitor companies.
 
 CRITICAL VALIDATION RULES:
-1. Include a company if it competes in ANY of these four ways:
+1. Include a company ONLY if it clearly operates in {category_str} and competes in
+   one of these four ways:
    a) Sells essentially the same standalone product to the same buyer (direct competition).
    b) Is a large platform that ships the same CAPABILITY as a built-in feature — e.g.
       GitHub / GitLab compete with developer security tools by bundling security scanning.
@@ -196,13 +197,17 @@ CRITICAL VALIDATION RULES:
       managed service — e.g. AWS RDS/Aurora competes with enterprise PostgreSQL vendors.
    d) Is the free open-source version of the same technology the target commercialises.
 2. NEVER include software review or comparison platforms (G2, Capterra, TrustRadius,
-   PeerSpot, Comparably, etc.) — they don't sell a competing product.
+   PeerSpot, Comparably, RepVue, etc.) — they don't sell a competing product.
 3. NEVER include market research / analyst firms (Gartner, Forrester, IDC, McKinsey,
    Deloitte, etc.) — they publish reports, they are not product competitors.
 4. NEVER include news sites, media outlets, job boards, or directory sites as competitors.
-5. Many web pages mention unrelated companies — DO NOT include them just because they
+5. NEVER include design agencies, consulting firms, law firms, or service businesses.
+6. NEVER include venture capital or private equity firms as competitors.
+7. Many web pages mention unrelated companies — DO NOT include them just because they
    appear near the target's name. Sharing only an industry or customer type is not enough;
-   the company must displace the target in a buying decision.
+   the company must directly displace the target in a buying decision.
+8. If you are not confident that a company sells a competing PRODUCT (not a service or
+   advisory) in the SAME category ({category_str}), exclude it entirely.
 
 For each qualifying competitor found:
 1. Extract the company name

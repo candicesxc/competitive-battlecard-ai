@@ -140,10 +140,14 @@ class BattlecardCrew:
                     competitors=competitor_stubs,
                 )
 
-                # Filter and sort
+                # Filter and sort — drop irrelevant, design agencies, and anything with
+                # clearly insufficient product overlap (product_similarity < 50 or
+                # overall similarity_score < 35).
                 scored_competitors = [
                     c for c in scored_competitors
                     if c.get("competitor_type") != "irrelevant"
+                    and c.get("product_similarity", 0.0) >= 50
+                    and c.get("similarity_score", 0.0) >= 35
                 ]
                 scored_competitors.sort(
                     key=lambda c: c.get("similarity_score", 0.0), reverse=True
