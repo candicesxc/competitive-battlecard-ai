@@ -209,8 +209,7 @@ SKIP_DOMAIN_KEYWORDS: tuple[str, ...] = (
 # Checked as substrings of the NORMALISED name (lower, no spaces/dots/dashes).
 # ---------------------------------------------------------------------------
 NON_COMPETITOR_TYPE_FRAGMENTS: tuple[str, ...] = (
-    "ventureCapital",   # placeholder — see normalised forms below
-    # Normalised (lowercase, no spaces) forms:
+    # VC / investor firm patterns (normalised: lowercase, no spaces/dots/dashes)
     "venturecapital",
     "vcfund",
     "vcfirm",
@@ -219,6 +218,13 @@ NON_COMPETITOR_TYPE_FRAGMENTS: tuple[str, ...] = (
     "accelerator",
     "incubator",
     "valueaddvc",       # "Value Add VC" exactly
+    # Design / creative agency patterns
+    "newdealdesign",    # NewDealDesign — design agency
+    "designagency",
+    "creativestudio",
+    "designstudio",
+    # Generic short/meaningless names that slip through (exact normalized matches)
+    # These are too vague to be real competitors
 )
 
 NON_COMPETITOR_NAME_FRAGMENTS: tuple[str, ...] = (
